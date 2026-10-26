@@ -229,7 +229,6 @@
   width: calc(var(--page-w) + var(--spine-w) / 2);
   transform-origin: left center;
   transform-style: preserve-3d;
-  will-change: transform;
 }
 
 .book--single .leaf {
@@ -340,7 +339,7 @@
 
 .spine {
   position: absolute;
-  z-index: 1000; /* always above the pages; rings go through every sheet */
+  /* z-index is set in PageFlip.js: always above every page, since the rings go through each sheet */
   top: 0;
   bottom: 0;
   left: calc(50% - var(--spine-w) / 2);
