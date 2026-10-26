@@ -57,12 +57,12 @@ Collectors keep photocards in binders with clear pocket sleeves, and part of the
 ### Phase 1: Web prototype
 | Part | Choice | Why |
 |---|---|---|
-| Language | HTML + CSS + JavaScript (later TypeScript) | Simple, no setup needed |
-| Build tool | [Vite](https://vitejs.dev) | Fast dev server, easy to deploy |
+| Language | HTML + CSS + JavaScript (ES modules) | Simple, no setup needed |
+| Build tool | **None**: files are served exactly as they are | Nothing to install; libraries like Three.js load from a CDN when needed |
 | 3D page turn (simple) | **CSS 3D transforms** (`perspective`, `rotateY`, `backface-visibility`) | Smooth, light, good for a first version |
 | 3D page turn (realistic bend) | **Three.js**: a page mesh whose vertices are bent along a curl | A real paper-curl look |
 | Gestures | Pointer Events (drag progress → rotation angle) | Works with mouse and touch |
-| Storage | **IndexedDB** (via `idb-keyval`) | Can store many images on the device |
+| Storage | **IndexedDB** (built into the browser) | Can store many images on the device |
 | Hosting | GitHub Pages / Vercel | Free, one link to share |
 
 ### Phase 2: Native iOS
@@ -227,7 +227,8 @@ Card {
 coding_with_ai_diana/
 ├── README.md
 ├── index.html
-├── package.json
+├── .github/workflows/
+│   └── deploy.yml           # publishes main to GitHub Pages
 ├── public/
 │   └── sample-cards/        # placeholder art for demos (NOT real celebrity photos)
 └── src/
@@ -243,6 +244,7 @@ coding_with_ai_diana/
     ├── storage/
     │   └── db.js            # IndexedDB save/load
     └── styles/
+        ├── base.css
         ├── binder.css
         └── sleeve.css
 ```
@@ -253,7 +255,7 @@ coding_with_ai_diana/
 
 | Milestone | Goal | Done when… |
 |---|---|---|
-| **M0: Setup** | Vite project, deploy to GitHub Pages | The empty page is live at a public link |
+| **M0: Setup** | App skeleton, deploy to GitHub Pages | The empty page is live at a public link |
 | **M1: Static binder** | Cover plus a 2×2 page grid with placeholder cards | Looks like a binder on phone and computer |
 | **M2: Page turn v1** | CSS 3D flip with tap arrows | Pages flip smoothly at 60 fps |
 | **M3: Drag to flip** | Pointer and touch dragging with snapping | Feels natural on iPhone Safari |
@@ -277,12 +279,19 @@ coding_with_ai_diana/
 
 ---
 
-## 10. Getting started (after M0)
+## 10. Getting started
+
+No installs needed. Start a small local web server from the project folder:
 
 ```bash
-npm install
-npm run dev      # open the link it prints, then try it on your phone on the same Wi-Fi
+python3 -m http.server 8000
 ```
+
+Then open <http://localhost:8000> on your computer.
+To try it on your phone, connect it to the same Wi-Fi and open `http://<your-computer's-IP>:8000`.
+(Find the IP in System Settings → Wi-Fi → Details.)
+
+**Live version:** every merge into `main` is published automatically to GitHub Pages.
 
 ---
 
