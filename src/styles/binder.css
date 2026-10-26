@@ -5,7 +5,7 @@
 :root {
   --spine-w: 34px;
   --page-ratio: 1.45;
-  --chrome-h: calc(96px + var(--safe-top) + var(--safe-bottom)); /* toolbar + spacing */
+  --chrome-h: calc(150px + var(--safe-top) + var(--safe-bottom)); /* toolbar + page arrows + spacing */
   --screen-h: 100vh;
   --page-w: min(
     (100vw - 32px - var(--safe-left) - var(--safe-right) - var(--spine-w)) / 2,
@@ -145,44 +145,185 @@
   font-weight: 600;
 }
 
-.toolbar__pages {
-  justify-self: end;
-  color: var(--muted);
+/* ---------- Page arrows ---------- */
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.spread {
+.page-nav__btn {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  font: inherit;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--chip-bg);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.page-nav__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.page-nav__label {
+  min-width: 9.5em;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- The book (3D) ----------
+   Leaves turn around the spine. The spine sits in the middle on computers
+   and on the left edge on phones. */
+
+.book {
   position: relative;
+  width: calc(2 * var(--page-w) + var(--spine-w));
+  height: calc(var(--page-w) * var(--page-ratio));
+  perspective: 3400px;
+}
+
+.book--single {
+  width: calc(var(--page-w) + var(--spine-w));
+  perspective: 2000px;
+}
+
+/* Inside of the covers, under all the pages */
+.book__base {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: calc(var(--page-w) + var(--spine-w) / 2 + 6px);
+  background: var(--cover-color); /* fallback for older Safari */
+  background: color-mix(in srgb, var(--cover-color) 85%, #fff);
+  box-shadow: 0 16px 30px -10px rgba(60, 20, 45, 0.35);
+}
+
+.book__base--left {
+  left: -6px;
+  border-radius: 16px 0 0 16px;
+}
+
+.book__base--right {
+  right: -6px;
+  border-radius: 0 16px 16px 0;
+}
+
+.book--single .book__base--left { display: none; }
+.book--single .book__base--right { left: 0; border-radius: 10px 16px 16px 10px; }
+
+/* One sheet, hinged at the spine */
+.leaf {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  left: calc(var(--page-w) + var(--spine-w) / 2);
+  width: calc(var(--page-w) + var(--spine-w) / 2);
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.book--single .leaf {
+  left: calc(var(--spine-w) / 2);
+}
+
+.leaf__face {
+  position: absolute;
+  inset: 0;
   display: flex;
-  filter: drop-shadow(0 16px 28px rgba(60, 20, 45, 0.25));
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* The part of each face under the spine is hidden by the spine itself */
+.leaf__face--front { padding-left: calc(var(--spine-w) / 2); }
+.leaf__face--back {
+  padding-right: calc(var(--spine-w) / 2);
+  transform: rotateY(180deg);
+}
+
+/* Darkening (front) and shine (back) while a leaf turns */
+.leaf__shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.leaf__face--front .leaf__shade {
+  left: calc(var(--spine-w) / 2);
+  border-radius: 4px 14px 14px 4px;
+  background: linear-gradient(90deg, rgba(40, 10, 30, 0.35), rgba(40, 10, 30, 0.05) 70%, rgba(255, 255, 255, 0.25));
+}
+
+.leaf__face--back .leaf__shade {
+  right: calc(var(--spine-w) / 2);
+  border-radius: 14px 4px 4px 14px;
+  background: linear-gradient(270deg, rgba(40, 10, 30, 0.3), rgba(255, 255, 255, 0.35) 60%, transparent);
+}
+
+/* Shadows cast on the pages underneath a turning leaf */
+.book__shadow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--page-w) + var(--spine-w) / 2);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.book__shadow--right {
+  right: 0;
+  background: linear-gradient(90deg, rgba(30, 5, 20, 0.45), rgba(30, 5, 20, 0.12) 45%, transparent 80%);
+  border-radius: 0 14px 14px 0;
+}
+
+.book__shadow--left {
+  left: 0;
+  background: linear-gradient(270deg, rgba(30, 5, 20, 0.45), rgba(30, 5, 20, 0.12) 45%, transparent 80%);
+  border-radius: 14px 0 0 14px;
 }
 
 /* ---------- Pages ---------- */
 
 .page {
   position: relative;
+  flex: none;
   width: var(--page-w);
-  aspect-ratio: 1 / var(--page-ratio);
+  height: 100%;
   display: grid;
   align-content: center;
   padding: calc(var(--page-w) * 0.07);
   gap: calc(var(--page-w) * 0.05);
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.05), transparent 12%),
-    var(--page-bg);
+  background: var(--page-bg);
 }
 
 .page--2x2 { grid-template-columns: repeat(2, 1fr); }
 .page--3x3 { grid-template-columns: repeat(3, 1fr); }
 
-.page:first-child {
+/* Right-hand pages: shadow near the spine on the left */
+.leaf__face--front .page {
+  border-radius: 4px 14px 14px 4px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.07), transparent 12%),
+    var(--page-bg);
+}
+
+/* Left-hand pages: shadow near the spine on the right */
+.leaf__face--back .page {
   border-radius: 14px 4px 4px 14px;
   background:
     linear-gradient(270deg, rgba(0, 0, 0, 0.07), transparent 12%),
     var(--page-bg);
-}
-
-.page--second {
-  border-radius: 4px 14px 14px 4px;
 }
 
 .page__number {
@@ -198,8 +339,11 @@
 /* ---------- Spine and rings ---------- */
 
 .spine {
-  position: relative;
-  z-index: 1; /* rings sit on top of both pages */
+  position: absolute;
+  z-index: 1000; /* always above the pages; rings go through every sheet */
+  top: 0;
+  bottom: 0;
+  left: calc(50% - var(--spine-w) / 2);
   width: var(--spine-w);
   background: linear-gradient(90deg, var(--spine-dark), var(--spine-light) 50%, var(--spine-dark));
   display: flex;
@@ -209,7 +353,13 @@
   padding: 18% 0;
 }
 
+.book--single .spine {
+  left: 0;
+  border-radius: 10px 0 0 10px;
+}
+
 .ring {
+  flex: none;
   width: calc(var(--spine-w) * 1.9);
   height: calc(var(--spine-w) * 0.55);
   border-radius: 999px;
@@ -220,25 +370,11 @@
     0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
+.book--single .ring { transform: translateX(32%); } /* keep rings inside the binder */
+
 /* ---------- Phone vs computer ---------- */
 
-.only-narrow { display: none; }
-
 @media (max-width: 700px) {
-  .only-wide { display: none; }
-  .only-narrow { display: inline; }
-
-  /* Show one page with the rings on its left edge */
-  .page--second { display: none; }
-  .spine { order: -1; border-radius: 10px 0 0 10px; }
-  .ring { transform: translateX(32%); } /* keep rings inside the binder */
-  .page:first-child {
-    border-radius: 4px 14px 14px 4px;
-    background:
-      linear-gradient(90deg, rgba(0, 0, 0, 0.07), transparent 12%),
-      var(--page-bg);
-  }
-
   .toolbar__title { display: none; }
   .toolbar { grid-template-columns: 1fr 1fr; }
 }

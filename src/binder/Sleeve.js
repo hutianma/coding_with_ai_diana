@@ -40,3 +40,11 @@ export function createPage(page, pageNumber, binder) {
 
   return el;
 }
+
+// The plain back of a sheet (used when there's no page to show there).
+export function createBlankPage() {
+  const el = document.createElement('div');
+  el.className = 'page page--blank';
+  el.setAttribute('aria-hidden', 'true');
+  return el;
+}
