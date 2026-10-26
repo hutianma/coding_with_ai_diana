@@ -1,12 +1,14 @@
 import { createPage, createBlankPage } from './Sleeve.js';
 import { PageFlip } from './PageFlip.js';
+import { createPaging, pageLabel, clamp } from './paging.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
 // Shows the binder: first the cover, then the open pages you can turn.
 export function mountBinder(root, binder, { startOpen = false, startPage = 1 } = {}) {
   let isOpen = startOpen;
-  let focusPage = Math.max(1, Math.min(startPage, binder.pages.length)); // the page you're looking at (kept when switching phone ↔ computer)
+  // The page you're looking at (kept when switching phone ↔ computer)
+  let focusPage = clamp(Math.floor(startPage) || 1, 1, binder.pages.length);
   let cleanup = null; // removes listeners when leaving the open view
 
   function render({ moveFocus = false } = {}) {
@@ -78,11 +80,16 @@ export function mountBinder(root, binder, { startOpen = false, startPage = 1 } =
     const label = nav.querySelector('.page-nav__label');
 
     let flip = null;
+    let paging = null;
 
     function updateNav() {
-      label.textContent = pageLabel(flip, binder.pages.length);
+      label.textContent = pageLabel(paging.pagesShown(flip.current), binder.pages.length);
+
+      // If the arrow you're focused on gets disabled at the end, move focus to the other one
+      const focused = document.activeElement;
       prevBtn.disabled = !flip.canPrev;
       nextBtn.disabled = !flip.canNext;
+      if (focused?.disabled) (focused === prevBtn ? nextBtn : prevBtn).focus();
     }
 
     // Build the book for the current screen size: two pages or one
@@ -90,19 +97,20 @@ export function mountBinder(root, binder, { startOpen = false, startPage = 1 } =
       flip?.destroy();
       const single = phoneQuery.matches;
       const pages = binder.pages;
+      paging = createPaging(single, pages.length);
 
       flip = new PageFlip(stage, {
         single,
         coverColor: binder.coverColor,
-        // Phone: one page per leaf. Computer: two pages per leaf (front + back).
-        leafCount: single ? pages.length : Math.ceil(pages.length / 2),
-        start: single ? focusPage - 1 : Math.floor(focusPage / 2),
-        renderFace: (i, side) => {
-          const index = single ? (side === 'front' ? i : -1) : 2 * i + (side === 'front' ? 0 : 1);
+        leafCount: paging.leafCount,
+        maxCurrent: paging.maxCurrent,
+        start: paging.currentFor(focusPage),
+        renderFace: (leaf, side) => {
+          const index = paging.pageIndexOn(leaf, side);
           return pages[index] ? createPage(pages[index], index + 1, binder) : createBlankPage();
         },
         onChange: (current) => {
-          focusPage = single ? current + 1 : Math.max(1, Math.min(2 * current, pages.length));
+          focusPage = paging.pagesShown(current)[0];
           updateNav();
         },
       });
@@ -113,6 +121,9 @@ export function mountBinder(root, binder, { startOpen = false, startPage = 1 } =
     nextBtn.addEventListener('click', () => flip.next());
 
     function onKey(event) {
+      // Leave shortcuts like Cmd+← (browser Back) and keys used elsewhere alone
+      if (event.defaultPrevented || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+      if (event.target.closest?.('input, textarea, select, [contenteditable]')) return;
       if (event.key === 'ArrowRight') flip.next();
       if (event.key === 'ArrowLeft') flip.prev();
     }
@@ -130,17 +141,6 @@ export function mountBinder(root, binder, { startOpen = false, startPage = 1 } =
   }
 
   render();
-}
-
-// "Pages 2–3 of 4" on a computer, "Page 2 of 4" on a phone
-function pageLabel(flip, total) {
-  if (flip.single) return `Page ${flip.current + 1} of ${total}`;
-  const left = 2 * flip.current;
-  const right = left + 1;
-  const shown = [left, right].filter((n) => n >= 1 && n <= total);
-  return shown.length === 2
-    ? `Pages ${shown[0]}–${shown[1]} of ${total}`
-    : `Page ${shown[0]} of ${total}`;
 }
 
 function countCards(binder) {
