@@ -1,0 +1,249 @@
+/* ---------- Sizes ----------
+   A 2×2 page is about 1.45× taller than it is wide.
+   --page-w is the largest page width that fits the screen. */
+
+:root {
+  --spine-w: 34px;
+  --page-ratio: 1.45;
+  --chrome-h: 96px; /* room for the toolbar and outer spacing */
+  --page-w: min(
+    (100vw - 32px - var(--spine-w)) / 2,
+    (100svh - var(--chrome-h)) / var(--page-ratio)
+  );
+}
+
+/* Phones: one page at a time */
+@media (max-width: 700px) {
+  :root {
+    --spine-w: 26px;
+    --page-w: min(
+      100vw - 32px - var(--spine-w),
+      (100svh - var(--chrome-h)) / var(--page-ratio)
+    );
+  }
+}
+
+/* ---------- Cover ---------- */
+
+.cover {
+  position: relative;
+  width: calc(var(--page-w) + var(--spine-w));
+  aspect-ratio: 1 / var(--page-ratio);
+  max-height: calc(100svh - 32px);
+  border: 0;
+  padding: 0;
+  border-radius: 6px 18px 18px 6px;
+  cursor: pointer;
+  font: inherit;
+  color: #4a2a3a;
+  background:
+    radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.55), transparent 55%),
+    linear-gradient(150deg, var(--cover-color), color-mix(in srgb, var(--cover-color) 70%, #8a3d63));
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 18px 40px -12px rgba(90, 30, 60, 0.45);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.cover:hover {
+  transform: translateY(-3px);
+}
+
+.cover:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.cover__spine {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--spine-w);
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.04) 70%, rgba(255, 255, 255, 0.25));
+}
+
+.cover__label {
+  position: absolute;
+  top: 18%;
+  left: calc(var(--spine-w) + 12%);
+  right: 12%;
+  display: grid;
+  gap: 6px;
+  padding: 18px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.cover__title {
+  font-size: clamp(1.1rem, 4.5vw, 1.6rem);
+  font-weight: 700;
+}
+
+.cover__count {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.cover__hint {
+  position: absolute;
+  bottom: 9%;
+  left: var(--spine-w);
+  right: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.3; }
+}
+
+/* ---------- Open binder ---------- */
+
+.binder-view {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  animation: fade-in 0.35s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.98); }
+}
+
+.toolbar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.toolbar__back {
+  justify-self: start;
+  border: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--chip-bg);
+  cursor: pointer;
+}
+
+.toolbar__title {
+  font-weight: 600;
+}
+
+.toolbar__pages {
+  justify-self: end;
+  color: var(--muted);
+}
+
+.spread {
+  position: relative;
+  display: flex;
+  filter: drop-shadow(0 16px 28px rgba(60, 20, 45, 0.25));
+}
+
+/* ---------- Pages ---------- */
+
+.page {
+  position: relative;
+  width: var(--page-w);
+  aspect-ratio: 1 / var(--page-ratio);
+  display: grid;
+  align-content: center;
+  padding: calc(var(--page-w) * 0.07);
+  gap: calc(var(--page-w) * 0.05);
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.05), transparent 12%),
+    var(--page-bg);
+}
+
+.page--2x2 { grid-template-columns: repeat(2, 1fr); }
+.page--3x3 { grid-template-columns: repeat(3, 1fr); }
+
+.page:first-child {
+  border-radius: 14px 4px 4px 14px;
+  background:
+    linear-gradient(270deg, rgba(0, 0, 0, 0.07), transparent 12%),
+    var(--page-bg);
+}
+
+.page--second {
+  border-radius: 4px 14px 14px 4px;
+}
+
+.page__number {
+  position: absolute;
+  bottom: calc(var(--page-w) * 0.022);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+/* ---------- Spine and rings ---------- */
+
+.spine {
+  position: relative;
+  z-index: 1; /* rings sit on top of both pages */
+  width: var(--spine-w);
+  background: linear-gradient(90deg, var(--spine-dark), var(--spine-light) 50%, var(--spine-dark));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  padding: 18% 0;
+}
+
+.ring {
+  width: calc(var(--spine-w) * 1.9);
+  height: calc(var(--spine-w) * 0.55);
+  border-radius: 999px;
+  border: 3px solid var(--ring);
+  background: transparent;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* ---------- Phone vs computer ---------- */
+
+.only-narrow { display: none; }
+
+@media (max-width: 700px) {
+  .only-wide { display: none; }
+  .only-narrow { display: inline; }
+
+  /* Show one page with the rings on its left edge */
+  .page--second { display: none; }
+  .spine { order: -1; border-radius: 10px 0 0 10px; }
+  .ring { transform: translateX(32%); } /* keep rings inside the binder */
+  .page:first-child {
+    border-radius: 4px 14px 14px 4px;
+    background:
+      linear-gradient(90deg, rgba(0, 0, 0, 0.07), transparent 12%),
+      var(--page-bg);
+  }
+
+  .toolbar__title { display: none; }
+  .toolbar { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------- Reduce Motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .cover,
+  .cover__hint,
+  .binder-view {
+    animation: none;
+    transition: none;
+  }
+}
