@@ -56,7 +56,7 @@ A milestone is finished only when **all** of these are true:
 ## 4. Milestone task breakdown
 
 ### M0: Setup
-1. Create the Vite project (`index.html`, `src/main.js`, `package.json`).
+1. Create the app skeleton (`index.html`, `src/main.js`, `src/styles/base.css`). No build step.
 2. Add `.gitignore` (`node_modules`, `dist`).
 3. Set up the GitHub Pages deploy (GitHub Action on push to `main`).
 4. ✅ **Check:** the public link opens on the phone.
