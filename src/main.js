@@ -1,10 +1,10 @@
-// App entry point. For now it only shows a placeholder;
-// the binder itself arrives in M1.
+// App entry point: build the demo binder and show it.
+import { createSampleBinder } from './data/sampleBinder.js';
+import { mountBinder } from './binder/Binder.js';
+
 const app = document.getElementById('app');
 
-app.innerHTML = `
-  <section class="placeholder">
-    <h1>📒 Photocard Binder</h1>
-    <p>Coming soon: flip through your photocards in 3D.</p>
-  </section>
-`;
+// Adding ?open to the link skips the cover (handy for testing)
+const startOpen = new URLSearchParams(location.search).has('open');
+
+mountBinder(app, createSampleBinder(), { startOpen });

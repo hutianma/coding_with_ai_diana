@@ -33,7 +33,7 @@ Collectors keep photocards in binders with clear pocket sleeves, and part of the
 ## 3. Features
 
 ### MVP (must have)
-- [ ] Binder cover screen. Tap it to open.
+- [x] Binder cover screen. Tap it to open.
 - [ ] Pages with 2×2 or 3×3 card pockets.
 - [ ] **3D page turn**: drag the page edge to flip it, or tap the arrows.
 - [ ] Add cards from your photo library and crop them to photocard ratio (**55 × 85 mm**, about 2:3.1).
