@@ -9,6 +9,7 @@ export function createPocket(card) {
     pocket.append(createCard(card));
   } else {
     pocket.classList.add('pocket--empty');
+    pocket.setAttribute('role', 'img');
     pocket.setAttribute('aria-label', 'Empty pocket');
   }
 
@@ -21,17 +22,19 @@ export function createPocket(card) {
 }
 
 // A whole binder page: a grid of pockets.
-export function createPage(page, pageNumber, layout) {
+// Slots hold card ids; the cards themselves live in binder.cards.
+export function createPage(page, pageNumber, binder) {
   const el = document.createElement('section');
-  el.className = `page page--${layout}`;
+  el.className = `page page--${binder.layout}`;
   el.setAttribute('aria-label', `Page ${pageNumber}`);
 
-  for (const card of page.slots) {
-    el.append(createPocket(card));
+  for (const cardId of page.slots) {
+    el.append(createPocket(cardId ? binder.cards[cardId] : null));
   }
 
   const number = document.createElement('span');
   number.className = 'page__number';
+  number.setAttribute('aria-hidden', 'true');
   number.textContent = pageNumber;
   el.append(number);
 

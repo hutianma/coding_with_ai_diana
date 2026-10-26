@@ -55,12 +55,14 @@
 }
 
 .card__number {
+  font-size: 2rem;  /* fallback for older Safari */
   font-size: 32cqi;
   font-weight: 700;
   line-height: 1;
 }
 
 .card__label {
+  font-size: 0.55rem;
   font-size: 9cqi;
   letter-spacing: 0.12em;
   text-transform: uppercase;

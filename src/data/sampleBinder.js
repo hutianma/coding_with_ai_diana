@@ -17,6 +17,7 @@ function makePlaceholderCard(number) {
 
 export function createSampleBinder() {
   const pages = [];
+  const cards = {}; // every card, looked up by its id
   let cardNumber = 1;
 
   for (let p = 0; p < PAGE_COUNT; p++) {
@@ -24,7 +25,13 @@ export function createSampleBinder() {
     for (let s = 0; s < SLOTS_PER_PAGE; s++) {
       // Leave the last pocket empty so we can see what an empty pocket looks like
       const isLastSlot = p === PAGE_COUNT - 1 && s === SLOTS_PER_PAGE - 1;
-      slots.push(isLastSlot ? null : makePlaceholderCard(cardNumber++));
+      if (isLastSlot) {
+        slots.push(null);
+      } else {
+        const card = makePlaceholderCard(cardNumber++);
+        cards[card.id] = card;
+        slots.push(card.id); // pages only store the card's id
+      }
     }
     pages.push({ id: `page-${p + 1}`, slots });
   }
@@ -35,5 +42,6 @@ export function createSampleBinder() {
     coverColor: '#f2b8cc',
     layout: '2x2',
     pages,
+    cards,
   };
 }

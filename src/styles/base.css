@@ -13,6 +13,11 @@
   --spine-light: #f0d9e4;
   --ring: #c8c4cc;
   --radius: 14px;
+  /* Space taken by the iPhone notch and home bar (0 elsewhere) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color-scheme: light dark;
 }
@@ -42,6 +47,7 @@ html, body {
 }
 
 body {
+  overflow-x: hidden; /* never scroll sideways */
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font);
@@ -53,5 +59,9 @@ body {
   min-height: 100%;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding:
+    calc(16px + var(--safe-top))
+    calc(16px + var(--safe-right))
+    calc(16px + var(--safe-bottom))
+    calc(16px + var(--safe-left));
 }

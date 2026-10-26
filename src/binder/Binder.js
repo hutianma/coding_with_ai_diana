@@ -6,8 +6,13 @@ export function mountBinder(root, binder, { startOpen = false } = {}) {
   let isOpen = startOpen;
   const spreadStart = 0; // index of the left page in the open spread
 
-  function render() {
+  function render({ moveFocus = false } = {}) {
     root.replaceChildren(isOpen ? renderOpen() : renderCover());
+
+    // Keep keyboard / VoiceOver focus in a sensible place after switching views
+    if (moveFocus) {
+      root.querySelector(isOpen ? '.toolbar__back' : '.cover')?.focus();
+    }
   }
 
   function renderCover() {
@@ -18,14 +23,18 @@ export function mountBinder(root, binder, { startOpen = false } = {}) {
     cover.innerHTML = `
       <span class="cover__spine" aria-hidden="true"></span>
       <span class="cover__label">
-        <span class="cover__title">${binder.name}</span>
-        <span class="cover__count">${countCards(binder)} cards</span>
+        <span class="cover__title"></span>
+        <span class="cover__count"></span>
       </span>
       <span class="cover__hint">Tap to open</span>
     `;
+    // textContent (not innerHTML) so names are always shown as plain text
+    cover.querySelector('.cover__title').textContent = binder.name;
+    cover.querySelector('.cover__count').textContent = plural(countCards(binder), 'card');
+
     cover.addEventListener('click', () => {
       isOpen = true;
-      render();
+      render({ moveFocus: true });
     });
     return cover;
   }
@@ -42,15 +51,20 @@ export function mountBinder(root, binder, { startOpen = false } = {}) {
     toolbar.className = 'toolbar';
     toolbar.innerHTML = `
       <button class="toolbar__back" type="button">‹ Cover</button>
-      <span class="toolbar__title">${binder.name}</span>
+      <span class="toolbar__title"></span>
       <span class="toolbar__pages">
-        <span class="only-wide">Pages ${first}–${last} of ${total}</span>
-        <span class="only-narrow">Page ${first} of ${total}</span>
+        <span class="only-wide"></span>
+        <span class="only-narrow"></span>
       </span>
     `;
+    toolbar.querySelector('.toolbar__title').textContent = binder.name;
+    toolbar.querySelector('.only-wide').textContent =
+      first === last ? `Page ${first} of ${total}` : `Pages ${first}–${last} of ${total}`;
+    toolbar.querySelector('.only-narrow').textContent = `Page ${first} of ${total}`;
+
     toolbar.querySelector('.toolbar__back').addEventListener('click', () => {
       isOpen = false;
-      render();
+      render({ moveFocus: true });
     });
 
     const spread = document.createElement('div');
@@ -59,10 +73,11 @@ export function mountBinder(root, binder, { startOpen = false } = {}) {
     const left = binder.pages[spreadStart];
     const right = binder.pages[spreadStart + 1];
 
-    spread.append(createPage(left, first, binder.layout));
+    spread.append(createPage(left, first, binder));
     spread.append(createRings());
+    // TODO(M2): on phones, build only the page that is shown instead of hiding this one
     if (right) {
-      const rightPage = createPage(right, first + 1, binder.layout);
+      const rightPage = createPage(right, first + 1, binder);
       rightPage.classList.add('page--second');
       spread.append(rightPage);
     }
@@ -87,4 +102,8 @@ function countCards(binder) {
     (sum, page) => sum + page.slots.filter(Boolean).length,
     0,
   );
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
 }

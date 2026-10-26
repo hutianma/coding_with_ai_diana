@@ -5,11 +5,16 @@
 :root {
   --spine-w: 34px;
   --page-ratio: 1.45;
-  --chrome-h: 96px; /* room for the toolbar and outer spacing */
+  --chrome-h: calc(96px + var(--safe-top) + var(--safe-bottom)); /* toolbar + spacing */
+  --screen-h: 100vh;
   --page-w: min(
-    (100vw - 32px - var(--spine-w)) / 2,
-    (100svh - var(--chrome-h)) / var(--page-ratio)
+    (100vw - 32px - var(--safe-left) - var(--safe-right) - var(--spine-w)) / 2,
+    (var(--screen-h) - var(--chrome-h)) / var(--page-ratio)
   );
+}
+
+@supports (height: 100svh) {
+  :root { --screen-h: 100svh; } /* svh = the visible height on iPhone, without the address bar */
 }
 
 /* Phones: one page at a time */
@@ -17,8 +22,8 @@
   :root {
     --spine-w: 26px;
     --page-w: min(
-      100vw - 32px - var(--spine-w),
-      (100svh - var(--chrome-h)) / var(--page-ratio)
+      100vw - 32px - var(--safe-left) - var(--safe-right) - var(--spine-w),
+      (var(--screen-h) - var(--chrome-h)) / var(--page-ratio)
     );
   }
 }
@@ -29,13 +34,14 @@
   position: relative;
   width: calc(var(--page-w) + var(--spine-w));
   aspect-ratio: 1 / var(--page-ratio);
-  max-height: calc(100svh - 32px);
+  max-height: calc(var(--screen-h) - 32px);
   border: 0;
   padding: 0;
   border-radius: 6px 18px 18px 6px;
   cursor: pointer;
   font: inherit;
   color: #4a2a3a;
+  background: var(--cover-color); /* fallback for older Safari without color-mix */
   background:
     radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.55), transparent 55%),
     linear-gradient(150deg, var(--cover-color), color-mix(in srgb, var(--cover-color) 70%, #8a3d63));
@@ -245,5 +251,9 @@
   .binder-view {
     animation: none;
     transition: none;
+  }
+
+  .cover:hover {
+    transform: none;
   }
 }

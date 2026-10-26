@@ -8,9 +8,10 @@ export function createCard(card) {
     el.classList.add('card--placeholder');
     el.style.setProperty('--hue', card.hue);
     el.innerHTML = `
-      <span class="card__number">${card.number}</span>
-      <span class="card__label">photocard</span>
+      <span class="card__number" aria-hidden="true">${Number(card.number)}</span>
+      <span class="card__label" aria-hidden="true">photocard</span>
     `;
+    el.setAttribute('role', 'img');
     el.setAttribute('aria-label', `Placeholder card ${card.number}`);
   }
 
