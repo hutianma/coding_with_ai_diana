@@ -79,7 +79,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
 
     <section class="workshop__step" data-step="back" hidden>
       <div class="back-preview">
-        <div class="back-preview__front"><img alt="Card front"><img class="back-preview__sig" alt=""></div>
+        <div class="back-preview__front"><img alt="Card front"><canvas class="back-preview__sig" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" aria-hidden="true"></canvas></div>
         <div class="back-preview__back"></div>
       </div>
       <fieldset class="patterns finishes">
@@ -143,7 +143,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
   let back = existing ? { ...existing.back } : { ...lastBack };
   let finish = existing?.finish ?? lastFinish;
   let previewUrl = null;
-  let preview = null; // { blob, cropKey }: the front drawn for the back step, reused when saving
+  let preview = null; // { blob, image, cropKey }: the front drawn for the sign/back steps, reused when saving
   let skipped = 0; // photos that couldn't be opened
   let busy = false;
 
@@ -154,6 +154,8 @@ export function openWorkshop({ files, existing = null, onSave }) {
     setBusy(true);
     unloadImage(image);
     image = null;
+    preview = null; // never reuse the previous photo's front
+    previewToken++; // and ignore a preview of it that's still being drawn
     try {
       image = await loadImage(files[i]);
     } catch {
@@ -168,7 +170,12 @@ export function openWorkshop({ files, existing = null, onSave }) {
     showError(skipped ? `${skipped} photo${skipped > 1 ? 's' : ''} couldn't be opened and ${skipped > 1 ? 'were' : 'was'} skipped. Try JPEG or PNG.` : '');
     crop = existing?.crop ? { ...existing.crop } : { ...DEFAULT_CROP };
     cropImg.src = image.src;
-    await pad.reset(existing?.signature ?? null);
+    try {
+      await pad.reset(existing?.signature ?? null);
+    } catch {
+      await pad.reset(null);
+      showError("The saved signature couldn't be opened, so it was cleared. You can sign again.");
+    }
     pad.setColor(existing?.pen ?? lastPen);
     showStep('crop');
   }
@@ -238,7 +245,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
     const finishInput = dialog.querySelector(`input[name="finish"][value="${finish}"]`);
     if (finishInput) finishInput.checked = true;
     $('.back-preview__front').dataset.finish = finish;
-    sigPreview.src = pad.hasInk ? pad.toDataUrl() : '';
+    pad.copyTo(sigPreview); // a cheap copy of the signature for the preview
     sigPreview.hidden = !pad.hasInk;
     const colorInput = dialog.querySelector(`input[name="back-color"][value="${back.color}"]`);
     if (colorInput) colorInput.checked = true;
@@ -253,17 +260,23 @@ export function openWorkshop({ files, existing = null, onSave }) {
   // signature and back steps, and reused when saving)
   async function drawFrontPreview() {
     const cropKey = JSON.stringify(crop);
-    if (preview?.cropKey !== cropKey) {
+    if (!previewMatches()) {
       const token = ++previewToken;
+      const forImage = image;
       frontPreview.removeAttribute('src');
       signFront.removeAttribute('src');
-      const blob = await renderCardFront(image, crop);
-      if (token !== previewToken) return; // a newer preview has started
-      preview = { blob, cropKey };
+      const blob = await renderCardFront(forImage, crop);
+      if (token !== previewToken) return; // a newer preview (or photo) has started
+      preview = { blob, image: forImage, cropKey };
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(blob);
     }
     frontPreview.src = signFront.src = previewUrl;
+  }
+
+  // Is the stored preview exactly this photo with this crop?
+  function previewMatches() {
+    return preview?.image === image && preview.cropKey === JSON.stringify(crop);
   }
 
   function drawBack() {
@@ -274,7 +287,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
     setBusy(true);
     showError('');
     try {
-      const reuse = preview?.cropKey === JSON.stringify(crop);
+      const reuse = previewMatches();
       const [front, source, signature] = await Promise.all([
         reuse ? preview.blob : renderCardFront(image, crop),
         existing ? existing.source : shrinkSource(image),

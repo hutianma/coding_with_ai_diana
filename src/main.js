@@ -71,7 +71,10 @@ async function start() {
   // Save a new or edited card, then show the page it's on
   async function onSave(card, previous) {
     const page = await saveCard(binder, card);
-    if (previous) releaseImage(previous.front); // the edited card has a new front image
+    if (previous) {
+      releaseImage(previous.front); // the edited card has a new front image
+      if (previous.signature !== card.signature) releaseImage(previous.signature);
+    }
     cards[card.id] = card;
     show(page);
   }
@@ -79,6 +82,7 @@ async function start() {
   async function onDelete(card) {
     await deleteCard(binder, card.id);
     releaseImage(card.front);
+    releaseImage(card.signature);
     delete cards[card.id];
     show(view?.page ?? 0);
   }

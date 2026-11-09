@@ -99,8 +99,11 @@ export function createSignaturePad(canvas) {
       }
     },
 
-    toDataUrl() {
-      return canvas.toDataURL('image/png');
+    // Draw the signature onto another canvas (for previews)
+    copyTo(target) {
+      const t = target.getContext('2d');
+      t.clearRect(0, 0, target.width, target.height);
+      if (hasInk) t.drawImage(canvas, 0, 0, target.width, target.height);
     },
 
     // The signature as a PNG, or null if there's nothing drawn

@@ -124,6 +124,9 @@
 
 .viewer--holo .viewer__holo { display: block; }
 
+/* The binder's still shimmer would double up with the moving one */
+.viewer__face .card--holo::after { display: none; }
+
 /* ---------- Buttons ---------- */
 
 .viewer__controls {

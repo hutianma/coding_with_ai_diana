@@ -1,6 +1,6 @@
 // Pick up a card: it lifts out of its pocket, and you can flip it to see the back
 // and tilt it to make the surface shine. Only this one card is animated.
-import { createCard, cardName } from './Card.js';
+import { createCard, cardName, finishOf } from './Card.js';
 import { createCardBack, DEFAULT_BACK } from './CardBack.js';
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -40,7 +40,7 @@ export function openCardViewer(card, from) {
   front.firstElementChild.removeAttribute('aria-label');
   const back = $('.viewer__face--back');
   back.append(createCardBack(card.back ?? { ...DEFAULT_BACK, text: 'Sample' }), makeLayer('viewer__glare'));
-  dialog.classList.add(`viewer--${card.finish ?? 'glossy'}`);
+  dialog.classList.add(`viewer--${finishOf(card)}`);
 
   // ---------- Flip (tap, drag sideways, button, Enter/Space) ----------
   let flipAngle = 0; // 0 = front, 180 = back (any multiple of 180 when resting)
@@ -52,12 +52,17 @@ export function openCardViewer(card, from) {
     const showingBack = Math.round(angle / 180) % 2 !== 0;
     cardEl.setAttribute('aria-pressed', String(showingBack));
     dialog.classList.toggle('is-back', showingBack);
+    // Ease into place, then stop easing so tilting follows the pointer straight away
+    // (a timer as well as transitionend, which doesn't fire if nothing moved)
     cardEl.classList.add('is-settling');
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => cardEl.classList.remove('is-settling'), 600);
     draw();
   }
+  let settleTimer = 0;
 
   cardEl.addEventListener('transitionend', () => cardEl.classList.remove('is-settling'));
-  const flip = () => setFlipped(flipAngle + 180);
+  const flip = () => { if (!closing) setFlipped(flipAngle + 180); };
   $('.viewer__flip').addEventListener('click', flip);
   cardEl.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -85,6 +90,10 @@ export function openCardViewer(card, from) {
   const endDrag = (event) => {
     if (!drag || event.pointerId !== drag.id) return;
     const { moved } = drag;
+    if (closing) {
+      drag = null;
+      return;
+    }
     drag = null;
     if (!moved) return flip(); // a tap
     // Let go: settle on whichever side is facing you
@@ -167,16 +176,17 @@ export function openCardViewer(card, from) {
   }
 
   function draw() {
-    const showingBack = Math.round((flipAngle + dragAngle) / 180) % 2 !== 0;
-    // Tilt the opposite way on the back, so it still leans towards your finger
+    const angle = flipAngle + dragAngle;
     if (reducedMotion.matches) {
       // Reduce Motion: no turning in 3D; the sides swap with a fade (see CSS)
       cardEl.style.transform = 'none';
       return;
     }
-    const tx = tilt.x * MAX_TILT * (showingBack ? -1 : 1);
+    // On the back the sideways tilt is mirrored, so it still leans towards your finger.
+    // cos() blends smoothly between the two while the card is being turned.
+    const tx = tilt.x * MAX_TILT * Math.cos((angle * Math.PI) / 180);
     const ty = tilt.y * MAX_TILT;
-    cardEl.style.transform = `rotateX(${-ty}deg) rotateY(${flipAngle + dragAngle + tx}deg)`;
+    cardEl.style.transform = `rotateX(${-ty}deg) rotateY(${angle + tx}deg)`;
     // Shine follows the tilt: --mx/--my from 0% to 100%
     cardEl.style.setProperty('--mx', `${50 + tilt.x * 50}%`);
     cardEl.style.setProperty('--my', `${50 + tilt.y * 50}%`);
@@ -184,8 +194,10 @@ export function openCardViewer(card, from) {
   }
 
   // ---------- Open and close ----------
+  let closing = false;
   function close() {
-    if (!dialog.open) return;
+    if (!dialog.open || closing) return;
+    closing = true;
     cancelAnimationFrame(frame);
     removeEventListener('deviceorientation', onOrientation);
     let done = false;

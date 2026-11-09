@@ -6,6 +6,11 @@ export const FINISHES = [
   { value: 'holo', name: 'Holo' },
 ];
 
+// The card's finish, falling back to glossy for unknown values
+export function finishOf(card) {
+  return FINISHES.some((f) => f.value === card.finish) ? card.finish : 'glossy';
+}
+
 // A short name for a card, for screen readers and lists
 export function cardName(card) {
   const name = card.placeholder ? `Sample card ${card.number}`
@@ -17,7 +22,7 @@ export function cardName(card) {
 // with its signature and finish.
 export function createCard(card) {
   const el = document.createElement('div');
-  el.className = `card card--${FINISHES.some((f) => f.value === card.finish) ? card.finish : 'glossy'}`;
+  el.className = `card card--${finishOf(card)}`;
 
   if (card.placeholder) {
     el.classList.add('card--placeholder');
