@@ -130,7 +130,7 @@ export async function openBadgeWorkshop({ existing = null, onSave }) {
     <section class="workshop__step" data-step="style" hidden>
       <div class="badge-preview"></div>
       <button class="pattern badge-preview__shake" type="button">Shake ✨</button>
-      ${chips('fill', '流麻 fill', FILLS)}
+      ${chips('fill', 'Shaker fill', FILLS)}
       ${swatches('rim', 'Rim', RIM_COLORS)}
     </section>
   `;

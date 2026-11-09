@@ -14,11 +14,11 @@ export const FILLS = [
 // How each fill looks and moves: colors, size range (px on a 600 px badge), how
 // heavy it is in the liquid (1 = sinks normally, lower = floats more)
 const STYLES = {
-  glitter: { count: 55, size: [13, 24], weight: 1, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
-  snow: { count: 60, size: [8, 20], weight: 0.55, colors: ['#ffffff', '#f2f8ff'] },
-  stars: { count: 26, size: [22, 38], weight: 1.1, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
-  hearts: { count: 26, size: [22, 36], weight: 1.1, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
-  sakura: { count: 24, size: [22, 34], weight: 0.7, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
+  glitter: { count: 95, size: [13, 24], weight: 1, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
+  snow: { count: 100, size: [8, 20], weight: 0.55, colors: ['#ffffff', '#f2f8ff'] },
+  stars: { count: 44, size: [22, 38], weight: 1.1, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
+  hearts: { count: 44, size: [22, 36], weight: 1.1, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
+  sakura: { count: 40, size: [22, 34], weight: 0.7, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
 };
 
 const GRAVITY = 0.07; // px per frame², gentle: it's liquid

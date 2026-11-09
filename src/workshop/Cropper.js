@@ -41,6 +41,8 @@ export function createCropper({ area, frame, img, zoomInput = null, onChange = n
 
   function onDown(event) {
     if (!image) return;
+    // A button on top of the photo (e.g. "Change") must still get its tap
+    if (event.target.closest?.('button, a, input, label')) return;
     try { area.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   }
