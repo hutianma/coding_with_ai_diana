@@ -10,6 +10,8 @@
 import { clamp } from './paging.js';
 
 const FLIP_MS = 650;
+const DRAG_START_PX = 8; // move this far before a press becomes a drag
+const SWIPE_SPEED = 0.45; // px per ms; a flick this fast turns the page even if it's not past halfway
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 export class PageFlip {
@@ -67,6 +69,11 @@ export class PageFlip {
 
     container.append(this.el);
     this.update();
+
+    this.gesture = null; // the drag in progress, if any
+    this.el.addEventListener('pointerdown', this.onPointerDown);
+    // After a drag, swallow the click that browsers fire on release (so a drag never "taps" a card)
+    this.el.addEventListener('click', this.onClickCapture, true);
   }
 
   get canNext() { return this.current < this.maxCurrent; }
@@ -76,35 +83,47 @@ export class PageFlip {
   prev() { if (this.canPrev) this.flip(this.current - 1, -1); }
 
   flip(leafIndex, direction) {
+    if (this.gesture?.dir) return; // a finger is already turning a page
+
     // Pressing quickly: finish the previous flip at once, then start the new one
     this.finishRunning();
-
-    this.current += direction;
-    this.onChange?.(this.current);
+    this.commit(direction);
 
     if (reducedMotion.matches) {
       // Reduce Motion: no 3D turn, just a quick fade
       this.update();
-      this.el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+      this.fade();
       return;
     }
 
-    // Build the pages that the turn will uncover, but keep everything else where it was
-    this.fillFaces();
-
-    const leaf = this.leaves[leafIndex];
+    const leaf = this.beginTurn(leafIndex);
     const from = direction > 0 ? 0 : 1;
-    const to = 1 - from;
+    this.animate(leaf, from, 1 - from, FLIP_MS, easeInOut);
+  }
 
+  // Move to the next/previous position and build the pages that will be uncovered
+  commit(direction) {
+    this.current += direction;
+    this.onChange?.(this.current);
+    this.fillFaces();
+  }
+
+  // Lift one leaf above the others so it can turn
+  beginTurn(leafIndex) {
+    const leaf = this.leaves[leafIndex];
     leaf.el.hidden = false;
     leaf.el.style.zIndex = this.zTurning;
     leaf.el.style.visibility = 'visible';
     leaf.el.style.willChange = 'transform'; // only the turning leaf gets its own GPU layer
+    return leaf;
+  }
 
+  // Turn a leaf from one progress value to another, then settle everything
+  animate(leaf, from, to, ms, ease) {
     const startTime = performance.now();
     const step = (now) => {
-      const t = Math.min((now - startTime) / FLIP_MS, 1);
-      this.setProgress(leaf, from + (to - from) * easeInOut(t));
+      const t = ms > 0 ? Math.min((now - startTime) / ms, 1) : 1;
+      this.setProgress(leaf, from + (to - from) * ease(t));
       if (t < 1) {
         this.running.frame = requestAnimationFrame(step);
       } else {
@@ -113,6 +132,140 @@ export class PageFlip {
       }
     };
     this.running = { frame: requestAnimationFrame(step) };
+  }
+
+  fade() {
+    this.el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+  }
+
+  // ---------- Dragging with a finger or mouse ----------
+  //
+  // Computer: grab the right page to turn forward, the left page to turn back.
+  // Phone: drag left to turn forward, right to turn back.
+  // The page follows the finger; on release it finishes turning if it's past
+  // halfway or you flicked it, otherwise it springs back.
+
+  onPointerDown = (event) => {
+    if (this.gesture || !event.isPrimary) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+    const rect = this.el.getBoundingClientRect();
+    this.gesture = {
+      id: event.pointerId,
+      x0: event.clientX,
+      y0: event.clientY,
+      onLeftHalf: event.clientX < rect.left + rect.width / 2,
+      pageWidth: this.single ? rect.width : rect.width / 2,
+      dir: 0, // +1 forward, -1 back, 0 = not dragging yet
+      samples: [],
+    };
+    addEventListener('pointermove', this.onPointerMove, { passive: false });
+    addEventListener('pointerup', this.onPointerUp);
+    addEventListener('pointercancel', this.onPointerCancel);
+  };
+
+  onPointerMove = (event) => {
+    const g = this.gesture;
+    if (!g || event.pointerId !== g.id) return;
+    const dx = event.clientX - g.x0;
+    const dy = event.clientY - g.y0;
+
+    if (!g.dir) {
+      if (Math.abs(dx) < DRAG_START_PX && Math.abs(dy) < DRAG_START_PX) return;
+      // Mostly up/down: not a page turn
+      if (Math.abs(dy) > Math.abs(dx)) return this.endGesture();
+
+      const dir = this.single ? (dx < 0 ? 1 : -1) : (g.onLeftHalf ? -1 : 1);
+      if (dir > 0 ? !this.canNext : !this.canPrev) return this.endGesture();
+
+      g.dir = dir;
+      this.finishRunning();
+      if (!reducedMotion.matches) {
+        g.leaf = this.beginTurn(dir > 0 ? this.current : this.current - 1);
+      }
+      this.el.classList.add('is-dragging');
+      try { this.el.setPointerCapture(g.id); } catch { /* pointer already gone */ }
+    }
+
+    event.preventDefault();
+    g.dx = dx;
+    g.samples.push({ x: event.clientX, t: event.timeStamp });
+    if (g.samples.length > 6) g.samples.shift();
+
+    if (g.leaf) this.setProgress(g.leaf, this.dragProgress(g));
+  };
+
+  // 0 = flat on the right, 1 = flat on the left. Dragging one page width turns the page fully on
+  // a phone; on a computer the finger has further to travel (right page → left page).
+  dragProgress(g) {
+    const distance = this.single ? g.pageWidth : g.pageWidth * 1.5;
+    const turned = clamp((-g.dir * g.dx) / distance, 0, 1);
+    return g.dir > 0 ? turned : 1 - turned;
+  }
+
+  onPointerUp = (event) => {
+    const g = this.gesture;
+    if (!g || event.pointerId !== g.id) return;
+    this.endGesture();
+    if (!g.dir) return; // it was a tap, not a drag
+    this.justDragged = true;
+
+    // Speed in the direction of the turn, from the last few moves
+    const first = g.samples[0];
+    const last = g.samples[g.samples.length - 1];
+    const dt = last && first ? last.t - first.t : 0;
+    const speed = dt > 0 ? (-g.dir * (last.x - first.x)) / dt : 0;
+
+    if (!g.leaf) {
+      // Reduce Motion: a simple swipe, no 3D
+      if (-g.dir * g.dx > 50 || speed > SWIPE_SPEED) {
+        this.commit(g.dir);
+        this.update();
+        this.fade();
+      }
+      return;
+    }
+
+    const progress = this.dragProgress(g);
+    const amountTurned = g.dir > 0 ? progress : 1 - progress;
+    const finish = speed > SWIPE_SPEED || (amountTurned >= 0.5 && speed > -SWIPE_SPEED);
+
+    if (finish) {
+      this.commit(g.dir);
+      const target = g.dir > 0 ? 1 : 0;
+      this.animate(g.leaf, progress, target, settleTime(1 - amountTurned), easeOut);
+    } else {
+      const start = g.dir > 0 ? 0 : 1;
+      this.animate(g.leaf, progress, start, settleTime(amountTurned), easeOut);
+    }
+  };
+
+  onPointerCancel = (event) => {
+    const g = this.gesture;
+    if (!g || event.pointerId !== g.id) return;
+    this.endGesture();
+    if (g.leaf) {
+      // The system took over the touch (e.g. a call): put the page back
+      const progress = this.dragProgress(g);
+      this.animate(g.leaf, progress, g.dir > 0 ? 0 : 1, settleTime(0.5), easeOut);
+    }
+  };
+
+  onClickCapture = (event) => {
+    if (!this.justDragged) return;
+    this.justDragged = false;
+    event.stopPropagation();
+    event.preventDefault();
+  };
+
+  endGesture() {
+    removeEventListener('pointermove', this.onPointerMove);
+    removeEventListener('pointerup', this.onPointerUp);
+    removeEventListener('pointercancel', this.onPointerCancel);
+    this.el.classList.remove('is-dragging');
+    this.gesture = null;
+    // A click only follows a release right away; don't let a stale flag eat a later tap
+    setTimeout(() => { this.justDragged = false; }, 0);
   }
 
   finishRunning() {
@@ -183,6 +336,7 @@ export class PageFlip {
   }
 
   destroy() {
+    this.endGesture();
     this.finishRunning();
     this.el.remove();
   }
@@ -197,6 +351,15 @@ function makeDiv(className) {
   const el = document.createElement('div');
   el.className = className;
   return el;
+}
+
+// Shorter animation when there's less of the turn left to do
+function settleTime(fraction) {
+  return Math.max(140, FLIP_MS * 0.8 * fraction);
+}
+
+function easeOut(t) {
+  return 1 - Math.pow(1 - t, 3);
 }
 
 function easeInOut(t) {

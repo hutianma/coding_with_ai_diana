@@ -191,6 +191,19 @@
   perspective: 3400px;
 }
 
+/* Dragging: the finger turns pages, so don't scroll, zoom or select text */
+.book {
+  touch-action: none;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.book.is-dragging {
+  cursor: grabbing;
+}
+
 .book--single {
   width: calc(var(--page-w) + var(--spine-w));
   perspective: 2000px;
