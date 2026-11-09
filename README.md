@@ -35,7 +35,7 @@ Collectors keep photocards in binders with clear pocket sleeves, and part of the
 ### MVP (must have)
 - [x] Binder cover screen. Tap it to open.
 - [ ] Pages with 2×2 or 3×3 card pockets.
-- [ ] **3D page turn**: drag the page edge to flip it, or tap the arrows.
+- [x] **3D page turn**: drag the page edge to flip it, or tap the arrows.
 - [ ] Add cards from your photo library and crop them to photocard ratio (**55 × 85 mm**, about 2:3.1).
 - [ ] Rearrange cards by dragging. Remove cards.
 - [ ] Collection saved on the device, so it's still there after you close the app.
