@@ -37,7 +37,7 @@ export function createBadge(item, { live = false } = {}) {
     canvas.width = canvas.height = live ? BADGE_SIZE : THUMB_FILL_SIZE;
     el.append(canvas);
     const shaker = createShaker(canvas, { fill: item.fill, seed: item.seed ?? 1 });
-    shaker.settle(170); // partly sunk: pieces drift in the lower half, like a badge just set down
+    shaker.settle(80); // partly sunk: pieces drift in the lower half, like a badge just set down
     if (live) el.shaker = shaker; // the viewer moves it with the tilt
   }
 
