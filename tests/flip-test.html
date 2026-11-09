@@ -39,20 +39,20 @@ function check(name, got, want) {
     // Phone: rapid taps
     await load(390, 844, 'open'); await wait(100);
     let win = f.contentWindow, doc = win.document; fakeClock(win);
-    check('phone start', state(doc), { label: 'Page 1 of 4', turned: '0000', prevDisabled: true, nextDisabled: false });
+    check('phone start (?open)', state(doc), { label: 'Page 1 of 4', turned: '10000', prevDisabled: false, nextDisabled: false });
     const next = () => doc.querySelector('[data-dir=next]').click();
     const prev = () => doc.querySelector('[data-dir=prev]').click();
     for (let i = 0; i < 5; i++) next();      // only 3 turns possible
     prev(); prev(); next();                   // → page 3
     await wait(800);
-    check('phone rapid taps', state(doc), { label: 'Page 3 of 4', turned: '1100', hidden: '1100', prevDisabled: false, nextDisabled: false });
+    check('phone rapid taps', state(doc), { label: 'Page 3 of 4', turned: '11100', hidden: '11100', prevDisabled: false, nextDisabled: false });
     // Keyboard
     doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight' }));
     await wait(800);
-    check('phone keyboard → last page', state(doc), { label: 'Page 4 of 4', turned: '1110', nextDisabled: true });
+    check('phone keyboard → last page', state(doc), { label: 'Page 4 of 4', turned: '11110', nextDisabled: true });
     for (let i = 0; i < 10; i++) doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft' }));
     await wait(800);
-    check('phone 10× back', state(doc), { label: 'Page 1 of 4', turned: '0000', hidden: '0000', prevDisabled: true });
+    check('phone 10× back → cover', state(doc), { label: 'Cover', turned: '00000', hidden: '00000', prevDisabled: true });
 
     // Computer
     await load(1280, 800, 'open'); await wait(100);
@@ -60,10 +60,10 @@ function check(name, got, want) {
     const n2 = () => doc.querySelector('[data-dir=next]').click();
     for (let i = 0; i < 10; i++) n2();
     await wait(800);
-    check('desktop 10× next → end', state(doc), { label: 'Page 4 of 4', turned: '11', hidden: '00', nextDisabled: true, prevDisabled: false });
+    check('desktop 10× next → end', state(doc), { label: 'Page 4 of 4', turned: '111', hidden: '000', nextDisabled: true, prevDisabled: false });
     doc.querySelector('[data-dir=prev]').click();
     await wait(800);
-    check('desktop back one', state(doc), { label: 'Pages 2–3 of 4', turned: '10' });
+    check('desktop back one', state(doc), { label: 'Pages 2–3 of 4', turned: '110' });
 
     // Only the 2 visible faces are readable by VoiceOver
     const readable = [...doc.querySelectorAll('.leaf__face')].filter(f => !f.inert && !f.closest('[hidden]'));
@@ -83,13 +83,61 @@ function check(name, got, want) {
     await load(390, 844, 'page=2.5'); await wait(100);
     check('?page=2.5 → page 2', state(f.contentWindow.document), { label: 'Page 2 of 4' });
 
+    // The cover
+    await load(390, 844, ''); await wait(100);
+    win = f.contentWindow; doc = win.document; fakeClock(win);
+    check('no link options → starts closed on the cover', state(doc), { label: 'Cover', turned: '00000', prevDisabled: true });
+    doc.querySelector('.cover-face').click(); await wait(800);
+    check('tapping the cover opens page 1', state(doc), { label: 'Page 1 of 4', turned: '10000' });
+    doc.querySelector('[data-dir=next]').click(); doc.querySelector('[data-dir=next]').click(); await wait(800);
+    doc.querySelector('.toolbar__back').click(); await wait(800);
+    check('"‹ Cover" closes the binder from page 3', state(doc), { label: 'Cover', turned: '00000' });
+
+    await load(1280, 800, ''); await wait(100);
+    win = f.contentWindow; doc = win.document; fakeClock(win);
+    const closed = getComputedStyle(doc.querySelector('.book')).getPropertyValue('--closed').trim();
+    const ring = getComputedStyle(doc.querySelector('.ring')).opacity;
+    results.push((closed === '1' && ring === '0' ? 'PASS' : 'FAIL') + ` desktop closed: centered and rings hidden (--closed=${closed}, ring opacity=${ring})`);
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight' })); await wait(800);
+    const open = getComputedStyle(doc.querySelector('.book')).getPropertyValue('--closed').trim();
+    check('desktop → key opens the cover', state(doc), { label: 'Page 1 of 4', turned: '100' });
+    results.push((open === '0' ? 'PASS' : 'FAIL') + ` desktop open: --closed=${open}`);
+
+    // Keyboard focus survives opening and closing
+    await load(1280, 800, 'page=3'); await wait(100);
+    win = f.contentWindow; doc = win.document; fakeClock(win);
+    doc.querySelector('.toolbar__back').focus();
+    doc.querySelector('.toolbar__back').click(); await wait(800);
+    results.push((doc.activeElement === doc.querySelector('.cover-face') ? 'PASS' : 'FAIL') + ' focus moves to the cover after "‹ Cover" (got ' + doc.activeElement?.className + ')');
+    doc.querySelector('.cover-face').click(); await wait(800);
+    results.push((doc.activeElement === doc.querySelector('[data-dir=next]') ? 'PASS' : 'FAIL') + ' focus moves to › after opening the cover (got ' + doc.activeElement?.className + ')');
+
+    // The cover board stays under the left page on later spreads
+    await load(1280, 800, 'page=4'); await wait(100);
+    doc = f.contentWindow.document;
+    const coverLeaf = doc.querySelector('.leaf--cover');
+    results.push((!coverLeaf.hidden ? 'PASS' : 'FAIL') + ' desktop: cover board still there at the last spread');
+
+    // ?page with no number opens at page 1
+    await load(390, 844, 'page'); await wait(100);
+    check('bare ?page opens page 1', state(f.contentWindow.document), { label: 'Page 1 of 4' });
+
+    // A binder with no pages can still be opened
+    const { mountBinder } = await import('/src/binder/Binder.js');
+    const box = document.createElement('div'); document.body.append(box);
+    const empty = mountBinder(box, { name: 'Empty', coverColor: '#ccc', layout: '2x2', pages: [], cards: {} });
+    box.querySelector('[data-dir=next]').click(); await wait(1000);
+    const emptyLabel = box.querySelector('.page-nav__label').textContent;
+    results.push((emptyLabel === 'Page 1 of 1' ? 'PASS' : 'FAIL') + ' empty binder opens to an empty page (' + emptyLabel + ')');
+    empty.destroy(); box.remove();
+
     // Paging maths with an odd number of pages
     const { createPaging, pageLabel } = await import('/src/binder/paging.js');
     const p3 = createPaging(false, 3);
     const labels = []; for (let c = 0; c <= p3.maxCurrent; c++) labels.push(pageLabel(p3.pagesShown(c), 3));
-    results.push((labels.join(' | ') === 'Page 1 of 3 | Pages 2–3 of 3' ? 'PASS' : 'FAIL') + ' odd pages (3): ' + labels.join(' | '));
+    results.push((labels.join(' | ') === 'Cover | Page 1 of 3 | Pages 2–3 of 3' ? 'PASS' : 'FAIL') + ' odd pages (3): ' + labels.join(' | '));
     const p1 = createPaging(false, 1);
-    results.push((p1.maxCurrent === 0 && pageLabel(p1.pagesShown(0), 1) === 'Page 1 of 1' ? 'PASS' : 'FAIL') + ' single page binder');
+    results.push((p1.maxCurrent === 1 && pageLabel(p1.pagesShown(1), 1) === 'Page 1 of 1' ? 'PASS' : 'FAIL') + ' single page binder');
     out.dataset.done = 1;
   } catch (e) { results.push('ERROR ' + e.stack); }
   out.textContent = results.join('\n');
