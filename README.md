@@ -43,7 +43,7 @@ If people like it, sharing features grow step by step (see [§8 Later](#8-later-
 | Item | Details |
 |---|---|
 | **Photocard** | 55 × 85 mm ratio, front + back design, rounded corners, finish (matte / glossy / holo), handwritten signature or text |
-| **Badge (吧唧)** | Round badge with a glossy dome and colored rim; optional **流麻 (shaker) fill**: glitter, snow, stars, hearts or sakura pieces floating in liquid that drift when you tilt the phone |
+| **Badge (吧唧)** | Round badge with a glossy dome and colored rim; optional **流麻 (shaker) fill**: glitter, snow, stars, hearts, sakura or fine gold dust floating in liquid. The pieces fall with real gravity (also upside down), flutter as they sink, and scatter like a snow globe when you shake the phone or drag the badge |
 | **Polaroid (拍立得)** | Instant-film print with a colored frame and a handwritten caption; **合拍** layouts put two photos side by side or top & bottom |
 | **Stickers** | Cut-out stickers to decorate pages and covers (later) |
 | **Acrylic stand** | Cut-out figure on a clear base (later, optional) |
@@ -145,7 +145,7 @@ Badge {                   // M6, stored in "merch"
   image: Blob             // the round photo, saved square (600 × 600)
   source: Blob            // smaller copy of the original, for re-cropping
   crop: { zoom, x, y }
-  fill: "none" | "glitter" | "snow" | "stars" | "hearts" | "sakura"   // 流麻
+  fill: "none" | "glitter" | "snow" | "stars" | "hearts" | "sakura" | "gold"   // 流麻
   rim: string             // rim color
   seed: number            // so the floating pieces settle the same way every time
 }

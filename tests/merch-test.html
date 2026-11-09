@@ -11,9 +11,9 @@
 <iframe id="f" style="width:390px;height:844px;border:0"></iframe>
 <pre id="out">running…</pre>
 <script type="module">
-import { createShaker } from '/src/merch/shaker.js';
+import { createShaker, FILLS } from '/src/merch/shaker.js';
 import { polaroidSizes, LAYOUTS } from '/src/merch/Polaroid.js';
-import { screenGravity, screenAcceleration } from '/src/merch/motion.js';
+import { screenGravity, screenAcceleration, deviceGravity, tiltBetween, recenter } from '/src/merch/motion.js';
 
 const out = document.getElementById('out');
 const results = [];
@@ -109,6 +109,65 @@ try {
   pushed.advance(12);
   const middleAfter = middleOf(pc);
   check('jerking the badge down throws the pieces up', middleBefore - middleAfter > 80, `middle ${middleBefore.toFixed(0)} → ${middleAfter.toFixed(0)}`);
+
+  // Settled pieces form a layer along the bottom, not one clump at the lowest point
+  const layer = document.createElement('canvas'); layer.width = layer.height = 600;
+  createShaker(layer, { fill: 'glitter', seed: 3 }).settle(900);
+  const widthOfPile = (() => {
+    const d = layer.getContext('2d').getImageData(0, 0, 600, 600).data; let lo = 600, hi = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) { const x = (i >> 2) % 600; lo = Math.min(lo, x); hi = Math.max(hi, x); }
+    return hi - lo;
+  })();
+  check('settled pieces pile up in a layer, not one clump', widthOfPile > 250, `${widthOfPile}px wide`);
+
+  // A shake scatters them all through the badge (snow globe), not as one lump
+  const globe = document.createElement('canvas'); globe.width = globe.height = 600;
+  const globeShaker = createShaker(globe, { fill: 'snow', seed: 3 });
+  globeShaker.settle(900);
+  globeShaker.shake(); globeShaker.stop();
+  globeShaker.advance(15);
+  const quarters = [[0, 0], [300, 0], [0, 300], [300, 300]].map(([x, y]) => {
+    const d = globe.getContext('2d').getImageData(x, y, 300, 300).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n;
+  });
+  check('after a shake, pieces are in every quarter of the badge', quarters.every((n) => n > 200), quarters.join(' / '));
+
+  // After a shake, everything comes completely to rest (so the animation stops and saves
+  // battery): within 20 s, even the slow gold dust
+  for (const fill of FILLS.map((f) => f.value).filter((f) => f !== 'none')) {
+    const still = document.createElement('canvas'); still.width = still.height = 600;
+    const sh = createShaker(still, { fill, seed: 21 });
+    sh.settle(900); sh.stop();
+    sh.shake(); sh.stop();
+    sh.advance(20);
+    const moving = !sh.isSettled;
+    let frames = 20;
+    while (!sh.isSettled && frames < 1200) { sh.advance(10); frames += 10; }
+    check(`${fill}: moves when shaken, then comes completely to rest`, moving && sh.isSettled, `${(frames / 60).toFixed(1)} s`);
+  }
+
+  // Gold dust: lots of fine flecks
+  check('there is a Gold dust fill', FILLS.some((f) => f.value === 'gold'));
+  const dust = document.createElement('canvas'); dust.width = dust.height = 600;
+  createShaker(dust, { fill: 'gold', seed: 3 }).settle(40);
+  const dustPixels = (() => { const d = dust.getContext('2d').getImageData(0, 0, 600, 600).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n; })();
+  check('gold dust is fine (many small flecks)', dustPixels > 1500 && dustPixels < 20000, dustPixels);
+
+  // ---------- Shine tilt from gravity ----------
+  const flat = deviceGravity({ x: 0, y: 0, z: -9.81 }, { apple: true, angle: 0 });
+  const unit = (x, y, z) => { const l = Math.hypot(x, y, z); return { x: x / l, y: y / l, z: z / l }; };
+  const rightDown = unit(0.2, 0, -0.98);
+  const topDown = unit(0, 0.2, -0.98);
+  check('lying flat: gravity points into the table', near(flat.z, -1));
+  check('flat, right side down → shine moves right', tiltBetween(flat, rightDown).x > 0.15);
+  check('flat, top tipped away → shine moves up', tiltBetween(flat, topDown).y < -0.15);
+  const upright = unit(0, -1, 0);
+  const uprightTurned = unit(0.2, -0.98, 0);
+  const uprightTipped = unit(0, -0.98, -0.2);
+  check('upright works too (no jumping): turning right → right', tiltBetween(upright, uprightTurned).x > 0.15 && Math.abs(tiltBetween(upright, uprightTurned).y) < 0.05);
+  check('upright: tipping the top away → up', tiltBetween(upright, uprightTipped).y < -0.15);
+  let rest = flat;
+  for (let i = 0; i < 300; i++) rest = recenter(rest, rightDown, 0.02);
+  check('holding still at a new angle, the shine comes back to the middle', Math.abs(tiltBetween(rest, rightDown).x) < 0.01);
 
   // Gravity pointing up (phone upside down): pieces collect at the top
   pushed.setGravity(0, -1);

@@ -1,5 +1,6 @@
 // 流麻 (shaker) fill: little pieces floating in liquid inside a round badge.
-// They sink slowly with gravity, drift when you tilt the phone, and swirl when shaken.
+// They sink with gravity, each at its own speed, flutter a little as they fall, and
+// scatter in every direction when shaken — like a snow globe.
 // The canvas is square; pieces stay inside the circle.
 
 export const FILLS = [
@@ -9,19 +10,27 @@ export const FILLS = [
   { value: 'stars', name: 'Stars' },
   { value: 'hearts', name: 'Hearts' },
   { value: 'sakura', name: 'Sakura' },
+  { value: 'gold', name: 'Gold dust' },
 ];
 
-// How each fill looks and moves: colors, size range (px on a 600 px badge), how
-// heavy it is in the liquid (1 = sinks normally, lower = floats more)
+// How each fill looks and moves (sizes in px on a 600 px badge):
+//   weight  – how fast it sinks, a range so pieces separate as they fall (1 = normal)
+//   flutter – how much it drifts side to side while falling (snow and petals the most)
+//   overlap – how closely pieces can pack (powder packs tighter)
+//   dust    – drawn as tiny glinting flecks (fast to draw in large numbers)
 const STYLES = {
-  glitter: { count: 95, size: [13, 24], weight: 1, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
-  snow: { count: 100, size: [8, 20], weight: 0.55, colors: ['#ffffff', '#f2f8ff'] },
-  stars: { count: 44, size: [22, 38], weight: 1.1, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
-  hearts: { count: 44, size: [22, 36], weight: 1.1, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
-  sakura: { count: 40, size: [22, 34], weight: 0.7, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
+  glitter: { count: 95, size: [13, 24], weight: [0.55, 1.3], flutter: 0.035, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
+  snow: { count: 100, size: [8, 20], weight: [0.3, 0.75], flutter: 0.06, colors: ['#ffffff', '#f2f8ff'] },
+  stars: { count: 44, size: [22, 38], weight: [0.7, 1.4], flutter: 0.02, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
+  hearts: { count: 44, size: [22, 36], weight: [0.7, 1.4], flutter: 0.02, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
+  sakura: { count: 40, size: [22, 34], weight: [0.4, 0.95], flutter: 0.07, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
+  // Fine gold powder: lots of tiny flecks that sparkle and hang in the liquid
+  gold: { count: 320, size: [2.5, 6], weight: [0.2, 0.6], flutter: 0.03, overlap: 0.6, dust: true, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
 };
 
 const GRAVITY = 0.12; // px per frame²: still liquid, but lively (top to bottom in ~2.5 s)
+const SLEEP_FRAMES = 30; // still for half a second → asleep
+const QUIET = 0.0036; // average movement under 0.06 px a frame counts as still (far too small to see)
 const DRAG = 0.96; // liquid slows everything down
 const RIM = 0.9; // pieces stay within 90% of the radius (inside the rim)
 
@@ -48,6 +57,9 @@ export function createShaker(canvas, { fill, seed = 1 }) {
   let gravity = { x: 0, y: 1 };
   let frame = 0;
   let quietFrames = 0;
+  let time = 0; // frames simulated, for the flutter
+  let lastEnergy = Infinity;
+  const swirlDir = random() < 0.5 ? -1 : 1; // this badge's liquid always swirls the same way
 
   const pieces = !style ? [] : Array.from({ length: style.count }, () => {
     const angle = random() * Math.PI * 2;
@@ -62,43 +74,162 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       rot: random() * Math.PI * 2,
       spin: (random() - 0.5) * 0.06,
       color: style.colors[Math.floor(random() * style.colors.length)],
-      // Lighter pieces sink slower; a little variety looks more natural
-      weight: style.weight * (0.7 + random() * 0.6),
+      // Each piece sinks at its own speed, so a cloud of them spreads out as it falls
+      weight: style.weight[0] + random() * (style.weight[1] - style.weight[0]),
+      // Its own side-to-side drift
+      flutter: style.flutter * (0.5 + random()),
+      freq: 0.03 + random() * 0.05,
+      phase: random() * Math.PI * 2,
     };
   });
 
   function step() {
-    let energy = 0;
+    time++;
     for (const p of pieces) {
-      p.vx = (p.vx + (gravity.x * GRAVITY * p.weight + (random() - 0.5) * 0.02) * k) * DRAG;
-      p.vy = (p.vy + (gravity.y * GRAVITY * p.weight + (random() - 0.5) * 0.02) * k) * DRAG;
+      p.px = p.x;
+      p.py = p.y;
+      // A piece that has been still for a while "sleeps": gravity no longer presses it
+      // into the pile, so the pile stays perfectly still. Tilting, shaking or being bumped
+      // wakes it up.
+      if (p.still > SLEEP_FRAMES) {
+        p.vx = p.vy = 0;
+        continue;
+      }
+      // Drift across the direction of fall (a falling snowflake rocks side to side) — only
+      // while it's actually moving, so pieces resting in the pile lie still and the loop can stop
+      const falling = Math.min(1, (p.moved ?? 1) / (1.5 * k));
+      const sway = Math.sin(time * p.freq + p.phase) * p.flutter * falling;
+      const jitter = 0.03 * falling;
+      p.vx = (p.vx + (gravity.x * GRAVITY * p.weight - gravity.y * sway + (random() - 0.5) * jitter) * k) * DRAG;
+      p.vy = (p.vy + (gravity.y * GRAVITY * p.weight + gravity.x * sway + (random() - 0.5) * jitter) * k) * DRAG;
       p.x += p.vx;
       p.y += p.vy;
       p.rot += p.spin + p.vx * 0.01;
+    }
+    separate();
+    // How much things actually moved this frame (pieces resting in the pile don't, even
+    // though gravity keeps pressing them down)
+    let energy = 0;
+    for (const p of pieces) {
+      keepInside(p); // after separating, which can nudge pieces outwards
+      const mx = p.x - p.px;
+      const my = p.y - p.py;
+      p.moved = Math.hypot(mx, my);
+      p.still = p.moved < 0.12 * k ? (p.still ?? 0) + 1 : 0;
+      energy += mx * mx + my * my;
+    }
+    lastEnergy = energy / Math.max(1, pieces.length);
+    return lastEnergy;
+  }
 
-      // Stay inside the badge: push back to the edge and bounce softly
-      const dx = p.x - center;
-      const dy = p.y - center;
-      const dist = Math.hypot(dx, dy);
-      const max = radius - p.size / 2;
-      if (dist > max) {
-        const nx = dx / dist;
-        const ny = dy / dist;
-        p.x = center + nx * max;
-        p.y = center + ny * max;
-        const along = p.vx * nx + p.vy * ny;
-        if (along > 0) {
-          p.vx -= 1.3 * along * nx;
-          p.vy -= 1.3 * along * ny;
+  // Stay inside the badge: push back to the edge and bounce softly
+  function keepInside(p) {
+    const dx = p.x - center;
+    const dy = p.y - center;
+    const dist = Math.hypot(dx, dy) || 0.01;
+    const max = radius - p.size / 2;
+    if (dist > max) {
+      const nx = dx / dist;
+      const ny = dy / dist;
+      p.x = center + nx * max;
+      p.y = center + ny * max;
+      const along = p.vx * nx + p.vy * ny;
+      if (along > 0) {
+        // Fast pieces bounce softly off the rim; slow ones just come to rest against it
+        const bounce = along > 2 * k ? 1.3 : 1;
+        p.vx -= bounce * along * nx;
+        p.vy -= bounce * along * ny;
+        p.vx *= 0.9; // a little friction along the rim
+        p.vy *= 0.9;
+        // …and when it's only creeping, it sticks (static friction), so a pile on the
+        // curved bottom stays put instead of slowly sliding and re-settling forever
+        if (Math.hypot(p.vx, p.vy) < 0.4 * k) p.vx = p.vy = 0;
+      }
+    }
+  }
+
+  // Pieces don't pass through each other: overlapping pieces are nudged apart, so they
+  // pile up into a layer at the bottom instead of all sinking to one spot (and a shake
+  // then scatters a whole layer, not a single clump). A grid keeps this quick.
+  const cellSize = Math.max(...pieces.map((p) => p.size), 1);
+  const cols = Math.ceil(size / cellSize) + 2;
+  const OVERLAP = style?.overlap ?? 0.85;
+  const grid = new Map(); // cell number → pieces in it (reused every frame)
+  const cellOf = (x, y) => (Math.floor(y / cellSize) + 1) * cols + Math.floor(x / cellSize) + 1;
+  function separate() {
+    for (const cell of grid.values()) cell.length = 0;
+    for (const p of pieces) {
+      const key = cellOf(p.x, p.y);
+      let cell = grid.get(key);
+      if (!cell) grid.set(key, (cell = []));
+      cell.push(p);
+    }
+    for (const p of pieces) {
+      const here = cellOf(p.x, p.y);
+      for (let row = -1; row <= 1; row++) {
+        for (let col = -1; col <= 1; col++) {
+          const cell = grid.get(here + row * cols + col);
+          if (!cell) continue;
+          for (const q of cell) {
+            if (q === p) continue;
+            const dx = q.x - p.x;
+            const dy = q.y - p.y;
+            const min = ((p.size + q.size) / 2) * OVERLAP;
+            const d2 = dx * dx + dy * dy;
+            if (d2 >= min * min) continue;
+            const d = Math.sqrt(d2) || 0.01;
+            if (d2 && min - d < 0.25 * k) continue; // barely touching: leave them be, so a pile can rest
+            const push = (min - d) / 4; // each pair is visited twice
+            const nx = d2 ? dx / d : random() - 0.5;
+            const ny = d2 ? dy / d : random() - 0.5;
+            p.x -= nx * push;
+            p.y -= ny * push;
+            q.x += nx * push;
+            q.y += ny * push;
+            if (push > 0.8 * k) p.still = q.still = 0; // a real bump wakes sleeping pieces
+            // Touching pieces stop moving into each other (no build-up of speed in the pile)
+            const closing = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
+            if (closing < 0) {
+              p.vx += (nx * closing) / 2;
+              p.vy += (ny * closing) / 2;
+              q.vx -= (nx * closing) / 2;
+              q.vy -= (ny * closing) / 2;
+            }
+          }
         }
       }
-      energy += p.vx * p.vx + p.vy * p.vy;
     }
-    return energy / Math.max(1, pieces.length);
+  }
+
+  function wakeAll() {
+    for (const p of pieces) p.still = 0;
+  }
+
+  // Turn the liquid around the middle (always the same way for this badge, so repeated
+  // shakes add up to a swirl instead of cancelling out)
+  function swirl(amount) {
+    const dir = swirlDir;
+    for (const p of pieces) {
+      const dx = p.x - center;
+      const dy = p.y - center;
+      const r = Math.hypot(dx, dy) / radius;
+      p.vx += -dy / radius * amount * dir * (0.5 + r);
+      p.vy += dx / radius * amount * dir * (0.5 + r);
+    }
+  }
+
+  function limit(p) {
+    const MAX = 30 * k;
+    const speed = Math.hypot(p.vx, p.vy);
+    if (speed > MAX) {
+      p.vx *= MAX / speed;
+      p.vy *= MAX / speed;
+    }
   }
 
   function draw() {
     ctx.clearRect(0, 0, size, size);
+    if (style?.dust) return drawDust();
     for (const p of pieces) {
       ctx.save();
       ctx.translate(p.x, p.y);
@@ -109,17 +240,31 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     }
   }
 
+  // Hundreds of tiny flecks: drawn quickly, each glinting as it turns
+  function drawDust() {
+    for (const p of pieces) {
+      ctx.globalAlpha = 0.35 + 0.65 * Math.abs(Math.cos(p.rot * 3));
+      ctx.fillStyle = p.color;
+      const s = p.size;
+      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s * (0.6 + 0.4 * Math.abs(Math.sin(p.rot))));
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function loop() {
     frame = 0;
     const energy = step();
     draw();
     // Stop when everything has settled (saves battery); a tilt or shake wakes it up
-    quietFrames = energy < 0.0004 * k * k ? quietFrames + 1 : 0;
+    quietFrames = energy < QUIET * k * k ? quietFrames + 1 : 0; // see isSettled
     if (quietFrames < 90) frame = requestAnimationFrame(loop);
   }
 
   return {
     get hasPieces() { return pieces.length > 0; },
+
+    // True once nothing is moving any more (the animation loop stops then)
+    get isSettled() { return lastEnergy < QUIET * k * k; },
 
     // Let everything sink to the bottom straight away (for still pictures)
     settle(steps = 900) {
@@ -139,26 +284,42 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     setGravity(x, y) {
       const changed = Math.abs(x - gravity.x) + Math.abs(y - gravity.y) > 0.01;
       gravity = { x, y };
-      if (changed) this.start();
+      if (changed) {
+        wakeAll();
+        this.start();
+      }
     },
 
     // The badge moved by (dx, dy) canvas pixels: the pieces lag behind, so they're
     // pushed the other way (a little differently each, so they spread out)
+    // Not every piece moves the same way: each also gets a kick in its own random
+    // direction, and the liquid swirls, so they scatter like a shaken snow globe
     push(dx, dy) {
-      const MAX = 30 * k;
+      wakeAll();
+      const strength = Math.hypot(dx, dy) * 0.45;
+      swirl(strength * 0.12);
       for (const p of pieces) {
-        const spread = 0.6 + random() * 0.8;
-        p.vx = Math.max(-MAX, Math.min(MAX, p.vx - dx * 0.45 * spread));
-        p.vy = Math.max(-MAX, Math.min(MAX, p.vy - dy * 0.45 * spread));
+        const along = 0.4 + random() * 1.2;
+        const angle = random() * Math.PI * 2;
+        const kick = strength * random() * 0.9;
+        p.vx += -dx * 0.45 * along + Math.cos(angle) * kick;
+        p.vy += -dy * 0.45 * along + Math.sin(angle) * kick;
+        limit(p);
       }
       this.start();
     },
 
-    // Swirl everything up
-    shake(strength = 6 * k) {
+    // Swirl everything up and out
+    shake(strength = 9 * k) {
+      wakeAll();
+      swirl(strength * 0.15);
       for (const p of pieces) {
-        p.vx += (random() - 0.5) * strength * 2;
-        p.vy += (random() - 0.8) * strength * 2;
+        const angle = random() * Math.PI * 2;
+        const kick = strength * (0.5 + random() * 1.5);
+        const lift = strength * (0.6 + random() * 1.2); // up, against gravity, by a different amount each
+        p.vx += Math.cos(angle) * kick - gravity.x * lift;
+        p.vy += Math.sin(angle) * kick - gravity.y * lift;
+        limit(p);
       }
       this.start();
     },

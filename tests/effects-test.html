@@ -75,6 +75,21 @@ try {
   await wait(100);
   check('Enter flips the card too', angleY() === beforeEnter + 180, `${beforeEnter} → ${angleY()}`);
 
+  // On a phone: the shine follows turning the phone, then settles back to the middle
+  const motion = (x, y, z) => win.dispatchEvent(new win.DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x, y, z }, acceleration: { x: 0, y: 0, z: 0 } }));
+  // (this test browser isn't an iPhone, so readings use the standard sign: flat = +z)
+  for (let i = 0; i < 5; i++) { motion(0, 0, 9.81); await wait(16); }
+  await wait(800);
+  const mxFlat = parseFloat(viewerCard().style.getPropertyValue('--mx'));
+  for (let i = 0; i < 6; i++) { motion(-2, 0, 9.6); await wait(16); } // right side tipped down
+  await wait(300);
+  const mxTurned = parseFloat(viewerCard().style.getPropertyValue('--mx'));
+  for (let i = 0; i < 250; i++) { motion(-2, 0, 9.6); await wait(16); } // …and held there for 4 s
+  await wait(1500);
+  const mxRested = parseFloat(viewerCard().style.getPropertyValue('--mx'));
+  check('phone turned → the shine moves; held still → it settles back to the middle',
+    mxTurned > mxFlat + 10 && Math.abs(mxRested - 50) < 8, `${mxFlat} → ${mxTurned} → ${mxRested}`);
+
   // Tilt with the mouse (computers)
   doc.querySelector('.viewer__stage').dispatchEvent(new win.PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse', clientX: r.right - 5, clientY: r.top + 5 }));
   await wait(1500);
