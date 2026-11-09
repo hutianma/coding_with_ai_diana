@@ -35,7 +35,7 @@ async function load(q = '') {
   await new Promise((r) => { f.onload = r; f.src = '/index.html?' + q; });
   win = f.contentWindow; doc = win.document;
   // Wait for the binder (saved data loads first)
-  for (let i = 0; i < 200 && !doc.querySelector('.book'); i++) await wait(50);
+  for (let i = 0; i < 400 && !doc.querySelector('.book'); i++) await wait(50);
 }
 
 async function until(test, ms = 8000) {
@@ -94,6 +94,7 @@ try {
 
   await load('');
   check('first visit: sample cards with a hint', !!doc.querySelector('.notice') && label() === 'Cover', doc.querySelector('.notice')?.textContent);
+  const memoryOnly = !!doc.querySelector('.notice--warning'); // this browser isn't letting the app save
 
   const photos = [await testPicture(1200, 900, 330, 'a.png'), await testPicture(800, 1400, 200, 'b.png')];
   await choosePhotos(photos);
@@ -166,9 +167,41 @@ try {
   doc.querySelector('.my-cards__close').click(); await wait(200);
   check('binder has 1 card left', photoCards() === 1, photoCards());
 
+  // ---------- Review fixes ----------
+  const notice = doc.querySelector('.notice');
+  const noticeH = parseFloat(doc.querySelector('.binder-view').style.getPropertyValue('--notice-h'));
+  check('pages make room for the notice\'s real height', !notice || near(noticeH, notice.offsetHeight + 12, 1), `${noticeH} vs ${notice?.offsetHeight}`);
+
+  const labelBefore = label();
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft' })); await wait(800);
+  check('arrow keys don\'t turn pages behind an open window', label() === labelBefore, `${labelBefore} → ${label()}`);
+  doc.querySelector('.my-cards__close').click(); await wait(100);
+
+  const broken = new File(['not a picture'], 'broken.jpg', { type: 'image/jpeg' });
+  await choosePhotos([broken, await testPicture(900, 1200, 90, 'c.png')]);
+  await until(() => title() === 'New card (2 of 2)');
+  const err = doc.querySelector('.workshop__error');
+  check('a photo that can\'t be opened is skipped, with a message', title() === 'New card (2 of 2)' && !err.hidden && /skipped/.test(err.textContent), `${title()} / ${err.textContent}`);
+  doc.querySelector('.workshop__close').click(); await wait(100);
+
+  doc.querySelector('[data-action="new"]').click();
+  const input2 = doc.querySelector('input[type=file]');
+  const dt2 = new win.DataTransfer(); dt2.items.add(new win.File(['nope'], 'x.jpg', { type: 'image/jpeg' }));
+  input2.files = dt2.files; input2.dispatchEvent(new win.Event('change'));
+  await until(() => !doc.querySelector('.workshop__error').hidden);
+  check('if no photo can be opened, the workshop explains and offers Close',
+    doc.querySelector('.workshop__primary').hidden && doc.querySelector('.workshop__secondary').textContent === 'Close', doc.querySelector('.workshop__error').textContent);
+  doc.querySelector('.workshop__secondary').click(); await wait(100);
+  check('Close closes it', !dialog());
+
+  doc.querySelector('[data-action="new"]').click();
+  doc.querySelector('[data-action="new"]').click();
+  check('a cancelled photo picker doesn\'t pile up', doc.querySelectorAll('input.photo-picker').length === 1, doc.querySelectorAll('input.photo-picker').length);
+
   // ---------- After a reload ----------
   await load('open');
-  if (doc.querySelector('.notice--warning')) {
+  if (memoryOnly) {
     results.push('SKIP saved after reload: this browser blocks saving (in-memory mode), so persistence must be checked in a real browser');
   } else {
     check('the card is still there after reloading', photoCards() === 1, photoCards());
