@@ -1,0 +1,97 @@
+<!--
+  Automated page-flip tests (M2).
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/flip-test.html  → every line should say PASS.
+  The page fakes the animation clock so flips finish instantly and predictably.
+-->
+<!doctype html><meta charset="utf-8"><body><iframe id="f" style="width:390px;height:844px;border:0"></iframe><h1>Page flip tests</h1><pre id="out">running…</pre>
+<script>
+const out = document.getElementById('out');
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+function load(w, h, q) {
+  f.style.width = w + 'px'; f.style.height = h + 'px';
+  return new Promise(r => { f.onload = r; f.src = '/index.html?' + q; });
+}
+function fakeClock(win) {
+  let now = 0;
+  win.performance.now = () => now;
+  win.requestAnimationFrame = (cb) => setTimeout(() => { now += 50; cb(now); }, 1);
+  win.cancelAnimationFrame = () => {};
+}
+function state(doc) {
+  const leaves = [...doc.querySelectorAll('.leaf')];
+  return {
+    label: doc.querySelector('.page-nav__label').textContent,
+    turned: leaves.map(l => l.style.transform.includes('-180') ? 1 : 0).join(''),
+    hidden: leaves.map(l => l.style.visibility === 'hidden' ? 1 : 0).join(''),
+    filled: leaves.map(l => l.querySelector('.page') ? 1 : 0).join(''),
+    prevDisabled: doc.querySelector('[data-dir=prev]').disabled,
+    nextDisabled: doc.querySelector('[data-dir=next]').disabled,
+  };
+}
+const results = [];
+function check(name, got, want) {
+  const ok = Object.keys(want).every(k => got[k] === want[k]);
+  results.push(`${ok ? 'PASS' : 'FAIL'} ${name}` + (ok ? '' : `\n   got  ${JSON.stringify(got)}\n   want ${JSON.stringify(want)}`));
+}
+(async () => {
+  try {
+    // Phone: rapid taps
+    await load(390, 844, 'open'); await wait(100);
+    let win = f.contentWindow, doc = win.document; fakeClock(win);
+    check('phone start', state(doc), { label: 'Page 1 of 4', turned: '0000', prevDisabled: true, nextDisabled: false });
+    const next = () => doc.querySelector('[data-dir=next]').click();
+    const prev = () => doc.querySelector('[data-dir=prev]').click();
+    for (let i = 0; i < 5; i++) next();      // only 3 turns possible
+    prev(); prev(); next();                   // → page 3
+    await wait(800);
+    check('phone rapid taps', state(doc), { label: 'Page 3 of 4', turned: '1100', hidden: '1100', prevDisabled: false, nextDisabled: false });
+    // Keyboard
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await wait(800);
+    check('phone keyboard → last page', state(doc), { label: 'Page 4 of 4', turned: '1110', nextDisabled: true });
+    for (let i = 0; i < 10; i++) doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    await wait(800);
+    check('phone 10× back', state(doc), { label: 'Page 1 of 4', turned: '0000', hidden: '0000', prevDisabled: true });
+
+    // Computer
+    await load(1280, 800, 'open'); await wait(100);
+    win = f.contentWindow; doc = win.document; fakeClock(win);
+    const n2 = () => doc.querySelector('[data-dir=next]').click();
+    for (let i = 0; i < 10; i++) n2();
+    await wait(800);
+    check('desktop 10× next → end', state(doc), { label: 'Page 4 of 4', turned: '11', hidden: '00', nextDisabled: true, prevDisabled: false });
+    doc.querySelector('[data-dir=prev]').click();
+    await wait(800);
+    check('desktop back one', state(doc), { label: 'Pages 2–3 of 4', turned: '10' });
+
+    // Only the 2 visible faces are readable by VoiceOver
+    const readable = [...doc.querySelectorAll('.leaf__face')].filter(f => !f.inert && !f.closest('[hidden]'));
+    results.push((readable.length === 2 ? 'PASS' : 'FAIL') + ' desktop: only 2 faces readable (got ' + readable.length + ')');
+
+    // Focus moves off a disabled arrow
+    await load(1280, 800, 'page=2'); await wait(100);
+    win = f.contentWindow; doc = win.document; fakeClock(win);
+    const nb = doc.querySelector('[data-dir=next]'); nb.focus(); nb.click(); await wait(800);
+    results.push((doc.activeElement === doc.querySelector('[data-dir=prev]') ? 'PASS' : 'FAIL') + ' focus moves to ‹ when › is disabled');
+
+    // Cmd+→ is ignored
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', metaKey: true })); await wait(800);
+    check('Cmd+← ignored', state(doc), { label: 'Page 4 of 4' });
+
+    // ?page=2.5 is rounded
+    await load(390, 844, 'page=2.5'); await wait(100);
+    check('?page=2.5 → page 2', state(f.contentWindow.document), { label: 'Page 2 of 4' });
+
+    // Paging maths with an odd number of pages
+    const { createPaging, pageLabel } = await import('/src/binder/paging.js');
+    const p3 = createPaging(false, 3);
+    const labels = []; for (let c = 0; c <= p3.maxCurrent; c++) labels.push(pageLabel(p3.pagesShown(c), 3));
+    results.push((labels.join(' | ') === 'Page 1 of 3 | Pages 2–3 of 3' ? 'PASS' : 'FAIL') + ' odd pages (3): ' + labels.join(' | '));
+    const p1 = createPaging(false, 1);
+    results.push((p1.maxCurrent === 0 && pageLabel(p1.pagesShown(0), 1) === 'Page 1 of 1' ? 'PASS' : 'FAIL') + ' single page binder');
+    out.dataset.done = 1;
+  } catch (e) { results.push('ERROR ' + e.stack); }
+  out.textContent = results.join('\n');
+})();
+</script>

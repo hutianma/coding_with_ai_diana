@@ -1,12 +1,19 @@
-import { createPage } from './Sleeve.js';
+import { createPage, createBlankPage } from './Sleeve.js';
+import { PageFlip } from './PageFlip.js';
+import { createPaging, pageLabel, clamp } from './paging.js';
 
-// Shows the binder: first the cover, then the open pages.
-// Page turning arrives in M2, so for now the first spread is always shown.
-export function mountBinder(root, binder, { startOpen = false } = {}) {
+const phoneQuery = matchMedia('(max-width: 700px)');
+
+// Shows the binder: first the cover, then the open pages you can turn.
+export function mountBinder(root, binder, { startOpen = false, startPage = 1 } = {}) {
   let isOpen = startOpen;
-  const spreadStart = 0; // index of the left page in the open spread
+  // The page you're looking at (kept when switching phone ↔ computer)
+  let focusPage = clamp(Math.floor(startPage) || 1, 1, binder.pages.length);
+  let cleanup = null; // removes listeners when leaving the open view
 
   function render({ moveFocus = false } = {}) {
+    cleanup?.();
+    cleanup = null;
     root.replaceChildren(isOpen ? renderOpen() : renderCover());
 
     // Keep keyboard / VoiceOver focus in a sensible place after switching views
@@ -34,6 +41,7 @@ export function mountBinder(root, binder, { startOpen = false } = {}) {
 
     cover.addEventListener('click', () => {
       isOpen = true;
+      focusPage = 1;
       render({ moveFocus: true });
     });
     return cover;
@@ -43,58 +51,96 @@ export function mountBinder(root, binder, { startOpen = false } = {}) {
     const view = document.createElement('div');
     view.className = 'binder-view';
 
-    const total = binder.pages.length;
-    const first = spreadStart + 1;
-    const last = Math.min(spreadStart + 2, total);
-
     const toolbar = document.createElement('header');
     toolbar.className = 'toolbar';
     toolbar.innerHTML = `
       <button class="toolbar__back" type="button">‹ Cover</button>
       <span class="toolbar__title"></span>
-      <span class="toolbar__pages">
-        <span class="only-wide"></span>
-        <span class="only-narrow"></span>
-      </span>
+      <span></span>
     `;
     toolbar.querySelector('.toolbar__title').textContent = binder.name;
-    toolbar.querySelector('.only-wide').textContent =
-      first === last ? `Page ${first} of ${total}` : `Pages ${first}–${last} of ${total}`;
-    toolbar.querySelector('.only-narrow').textContent = `Page ${first} of ${total}`;
-
     toolbar.querySelector('.toolbar__back').addEventListener('click', () => {
       isOpen = false;
       render({ moveFocus: true });
     });
 
-    const spread = document.createElement('div');
-    spread.className = 'spread';
+    const stage = document.createElement('div');
+    stage.className = 'stage';
 
-    const left = binder.pages[spreadStart];
-    const right = binder.pages[spreadStart + 1];
+    const nav = document.createElement('nav');
+    nav.className = 'page-nav';
+    nav.setAttribute('aria-label', 'Turn pages');
+    nav.innerHTML = `
+      <button class="page-nav__btn" type="button" data-dir="prev" aria-label="Previous page">‹</button>
+      <span class="page-nav__label" aria-live="polite"></span>
+      <button class="page-nav__btn" type="button" data-dir="next" aria-label="Next page">›</button>
+    `;
+    const prevBtn = nav.querySelector('[data-dir="prev"]');
+    const nextBtn = nav.querySelector('[data-dir="next"]');
+    const label = nav.querySelector('.page-nav__label');
 
-    spread.append(createPage(left, first, binder));
-    spread.append(createRings());
-    // TODO(M2): on phones, build only the page that is shown instead of hiding this one
-    if (right) {
-      const rightPage = createPage(right, first + 1, binder);
-      rightPage.classList.add('page--second');
-      spread.append(rightPage);
+    let flip = null;
+    let paging = null;
+
+    function updateNav() {
+      label.textContent = pageLabel(paging.pagesShown(flip.current), binder.pages.length);
+
+      // If the arrow you're focused on gets disabled at the end, move focus to the other one
+      const focused = document.activeElement;
+      prevBtn.disabled = !flip.canPrev;
+      nextBtn.disabled = !flip.canNext;
+      if (focused?.disabled) (focused === prevBtn ? nextBtn : prevBtn).focus();
     }
 
-    view.append(toolbar, spread);
+    // Build the book for the current screen size: two pages or one
+    function buildBook() {
+      flip?.destroy();
+      const single = phoneQuery.matches;
+      const pages = binder.pages;
+      paging = createPaging(single, pages.length);
+
+      flip = new PageFlip(stage, {
+        single,
+        coverColor: binder.coverColor,
+        leafCount: paging.leafCount,
+        maxCurrent: paging.maxCurrent,
+        start: paging.currentFor(focusPage),
+        renderFace: (leaf, side) => {
+          const index = paging.pageIndexOn(leaf, side);
+          return pages[index] ? createPage(pages[index], index + 1, binder) : createBlankPage();
+        },
+        onChange: (current) => {
+          focusPage = paging.pagesShown(current)[0];
+          updateNav();
+        },
+      });
+      updateNav();
+    }
+
+    prevBtn.addEventListener('click', () => flip.prev());
+    nextBtn.addEventListener('click', () => flip.next());
+
+    function onKey(event) {
+      // Leave shortcuts like Cmd+← (browser Back) and keys used elsewhere alone
+      if (event.defaultPrevented || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+      if (event.target.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (event.key === 'ArrowRight') flip.next();
+      if (event.key === 'ArrowLeft') flip.prev();
+    }
+    document.addEventListener('keydown', onKey);
+    phoneQuery.addEventListener('change', buildBook);
+    cleanup = () => {
+      document.removeEventListener('keydown', onKey);
+      phoneQuery.removeEventListener('change', buildBook);
+      flip?.destroy();
+    };
+
+    view.append(toolbar, stage, nav);
+    buildBook();
     return view;
   }
 
   render();
-}
-
-function createRings() {
-  const spine = document.createElement('div');
-  spine.className = 'spine';
-  spine.setAttribute('aria-hidden', 'true');
-  spine.innerHTML = '<span class="ring"></span>'.repeat(3);
-  return spine;
 }
 
 function countCards(binder) {
