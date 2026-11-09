@@ -45,7 +45,7 @@ async function until(test, ms = 8000) {
 
 // Choose photos in the "＋ New card" file picker
 async function choosePhotos(files) {
-  doc.querySelector('[data-action="new"]').click();
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
   const input = doc.querySelector('input[type=file]');
   const dt = new win.DataTransfer();
   for (const file of files) dt.items.add(new win.File([file], file.name, { type: file.type }));
@@ -189,7 +189,7 @@ try {
   check('a photo that can\'t be opened is skipped, with a message', title() === 'New card (2 of 2)' && !err.hidden && /skipped/.test(err.textContent), `${title()} / ${err.textContent}`);
   doc.querySelector('.workshop__close').click(); await wait(100);
 
-  doc.querySelector('[data-action="new"]').click();
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
   const input2 = doc.querySelector('input[type=file]');
   const dt2 = new win.DataTransfer(); dt2.items.add(new win.File(['nope'], 'x.jpg', { type: 'image/jpeg' }));
   input2.files = dt2.files; input2.dispatchEvent(new win.Event('change'));
@@ -199,8 +199,8 @@ try {
   doc.querySelector('.workshop__secondary').click(); await wait(100);
   check('Close closes it', !dialog());
 
-  doc.querySelector('[data-action="new"]').click();
-  doc.querySelector('[data-action="new"]').click();
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
   check('a cancelled photo picker doesn\'t pile up', doc.querySelectorAll('input.photo-picker').length === 1, doc.querySelectorAll('input.photo-picker').length);
 
   // ---------- After a reload ----------
