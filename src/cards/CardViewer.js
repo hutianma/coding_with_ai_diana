@@ -3,7 +3,7 @@
 // is animated.
 import { createCard, cardName, finishOf } from './Card.js';
 import { createCardBack, DEFAULT_BACK } from './CardBack.js';
-import { screenGravity, screenAcceleration } from '../merch/motion.js';
+import { screenGravity, screenAcceleration, deviceGravity, tiltBetween, recenter } from '../merch/motion.js';
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const MAX_TILT = 14; // degrees
@@ -187,19 +187,38 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     startLoop();
   });
 
-  let baseOrientation = null; // how the phone was held when the card was picked up
+  // The shine follows how the phone turns. The resting position slowly follows how you
+  // hold it, so the shine returns to the middle when you keep still — lying flat, upright,
+  // or in between — and only moves while you're turning the phone.
+  const RECENTER = 0.02; // per reading (about 60 a second): back to the middle in ~2 s
+  let tiltBase = null; // resting direction of gravity (from the motion sensor)
+  let tiltFromMotion = false;
+  let baseOrientation = null; // resting tilt angles (only if there's no motion sensor)
   function onOrientation(event) {
     if (event.beta == null || event.gamma == null) return;
-    baseOrientation ??= { beta: event.beta, gamma: event.gamma };
     // No motion sensor readings (some browsers): estimate "down" from the tilt angles
     if (!motionGravity) {
       const rad = Math.PI / 180;
       sendGravity(clamp(Math.sin(event.gamma * rad)), clamp(Math.sin(event.beta * rad)));
     }
+    if (tiltFromMotion) return; // the motion sensor gives a steadier tilt
+    baseOrientation ??= { beta: event.beta, gamma: event.gamma };
+    baseOrientation.beta += (event.beta - baseOrientation.beta) * RECENTER;
+    baseOrientation.gamma += (event.gamma - baseOrientation.gamma) * RECENTER;
     target = {
       x: clamp((event.gamma - baseOrientation.gamma) / 25),
       y: clamp((event.beta - baseOrientation.beta) / 25),
     };
+    startLoop();
+  }
+
+  function tiltFromGravity(aig) {
+    const now = deviceGravity(aig);
+    if (!now) return;
+    tiltFromMotion = true;
+    tiltBase = tiltBase ? recenter(tiltBase, now, RECENTER) : now;
+    const t = tiltBetween(tiltBase, now);
+    target = { x: clamp(t.x * 3), y: clamp(t.y * 3) };
     startLoop();
   }
 
@@ -217,6 +236,7 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     onGravity(x, y);
   }
   function onMotion(event) {
+    tiltFromGravity(event.accelerationIncludingGravity);
     const g = screenGravity(event.accelerationIncludingGravity);
     if (g) {
       motionGravity = true;
@@ -230,7 +250,7 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
 
   function listenToTilt({ orientation = true, motion = true } = {}) {
     if (orientation) addEventListener('deviceorientation', onOrientation);
-    if (motion && (onGravity || onShake)) addEventListener('devicemotion', onMotion);
+    if (motion) addEventListener('devicemotion', onMotion);
   }
 
   // iPhone: tilt needs a one-time "Allow" from a button tap. Computers (mouse) never ask.
@@ -249,7 +269,7 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
         };
         const [orientation, motion] = await Promise.all([
           ask(globalThis.DeviceOrientationEvent),
-          onGravity || onShake ? ask(globalThis.DeviceMotionEvent) : false,
+          ask(globalThis.DeviceMotionEvent),
         ]);
         motionAllowed = orientation || motion;
         motionBtn.hidden = true;
