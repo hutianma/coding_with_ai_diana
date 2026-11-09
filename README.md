@@ -79,7 +79,7 @@ Each milestone (M#) is one branch, built and reviewed as described in [WORKFLOW.
 | **M1: Binder** | Cover, binder pages, 2×2 pockets, placeholder cards | Looks like a binder on phone and computer | ✅ Done |
 | **M2: Page turn** | 3D page flip with arrows and keyboard | Pages flip smoothly at 60 fps | ✅ Done |
 | **M3: Drag to flip** | The page follows your finger, snaps or springs back | Feels natural on iPhone | ✅ Done |
-| **M4: Photocard Workshop** | Pick photos → crop to 55:85 → design the back → saved on the device → appears in the binder | Make 6 cards, reload, and they're still in the binder | ⬜ |
+| **M4: Photocard Workshop** | Pick photos → crop to 55:85 → design the back → saved on the device → appears in the binder | Make 6 cards, reload, and they're still in the binder | ✅ Done |
 | **M5: Card effects** | Tap to lift and flip a card, tilt + glare, holo foil | Cards feel like real objects | ⬜ |
 | **M6: More merch** | Badges, polaroids, acrylic stands | Make one of each from your photos | ⬜ |
 | **M7: Decorate** | DIY binder cover, DIY card backs (your own image, stickers), a journal page or ita bag display | A page you'd be proud to show | ⬜ |
