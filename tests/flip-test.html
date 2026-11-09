@@ -103,6 +103,34 @@ function check(name, got, want) {
     check('desktop → key opens the cover', state(doc), { label: 'Page 1 of 4', turned: '100' });
     results.push((open === '0' ? 'PASS' : 'FAIL') + ` desktop open: --closed=${open}`);
 
+    // Keyboard focus survives opening and closing
+    await load(1280, 800, 'page=3'); await wait(100);
+    win = f.contentWindow; doc = win.document; fakeClock(win);
+    doc.querySelector('.toolbar__back').focus();
+    doc.querySelector('.toolbar__back').click(); await wait(800);
+    results.push((doc.activeElement === doc.querySelector('.cover-face') ? 'PASS' : 'FAIL') + ' focus moves to the cover after "‹ Cover" (got ' + doc.activeElement?.className + ')');
+    doc.querySelector('.cover-face').click(); await wait(800);
+    results.push((doc.activeElement === doc.querySelector('[data-dir=next]') ? 'PASS' : 'FAIL') + ' focus moves to › after opening the cover (got ' + doc.activeElement?.className + ')');
+
+    // The cover board stays under the left page on later spreads
+    await load(1280, 800, 'page=4'); await wait(100);
+    doc = f.contentWindow.document;
+    const coverLeaf = doc.querySelector('.leaf--cover');
+    results.push((!coverLeaf.hidden ? 'PASS' : 'FAIL') + ' desktop: cover board still there at the last spread');
+
+    // ?page with no number opens at page 1
+    await load(390, 844, 'page'); await wait(100);
+    check('bare ?page opens page 1', state(f.contentWindow.document), { label: 'Page 1 of 4' });
+
+    // A binder with no pages can still be opened
+    const { mountBinder } = await import('/src/binder/Binder.js');
+    const box = document.createElement('div'); document.body.append(box);
+    const empty = mountBinder(box, { name: 'Empty', coverColor: '#ccc', layout: '2x2', pages: [], cards: {} });
+    box.querySelector('[data-dir=next]').click(); await wait(1000);
+    const emptyLabel = box.querySelector('.page-nav__label').textContent;
+    results.push((emptyLabel === 'Page 1 of 1' ? 'PASS' : 'FAIL') + ' empty binder opens to an empty page (' + emptyLabel + ')');
+    empty.destroy(); box.remove();
+
     // Paging maths with an odd number of pages
     const { createPaging, pageLabel } = await import('/src/binder/paging.js');
     const p3 = createPaging(false, 3);
