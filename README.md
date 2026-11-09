@@ -1,7 +1,7 @@
 # 💖 Pocket Fandom
 
 **A personal fan-merch workshop.**
-Turn the photos on your phone into your own digital fan merch (photocards, badges, polaroids, acrylic stands), keep them in a 3D binder, and make pages pretty enough to share.
+Turn the photos on your phone into your own digital fan merch (photocards, badges, polaroids), keep them in a 3D binder, and make pages pretty enough to share.
 
 > *Working title, so the name may change.*
 > **Status:** Phase 1 (single-player workshop) in progress.
@@ -43,10 +43,10 @@ If people like it, sharing features grow step by step (see [§8 Later](#8-later-
 | Item | Details |
 |---|---|
 | **Photocard** | 55 × 85 mm ratio, front + back design, rounded corners, finish (matte / glossy / holo), handwritten signature or text |
-| **Badge (吧唧)** | Round button badge with a glossy dome effect |
-| **Polaroid** | White frame with a handwritten caption |
-| **Acrylic stand** | Cut-out figure on a clear base (subject cut-out on the device) |
-| **Stickers** | Cut-out stickers to decorate pages and covers |
+| **Badge (吧唧)** | Round badge with a glossy dome and colored rim; optional **流麻 (shaker) fill**: glitter, snow, stars, hearts or sakura pieces floating in liquid that drift when you tilt the phone |
+| **Polaroid (拍立得)** | Instant-film print with a colored frame and a handwritten caption; **合拍** layouts put two photos side by side or top & bottom |
+| **Stickers** | Cut-out stickers to decorate pages and covers (later) |
+| **Acrylic stand** | Cut-out figure on a clear base (later, optional) |
 
 ### 📒 Collect & organize
 - **Binder** (already built): pockets, plastic sleeve shine, 3D page turning by dragging or tapping.
@@ -81,7 +81,7 @@ Each milestone (M#) is one branch, built and reviewed as described in [WORKFLOW.
 | **M3: Drag to flip** | The page follows your finger, snaps or springs back | Feels natural on iPhone | ✅ Done |
 | **M4: Photocard Workshop** | Pick photos → crop to 55:85 → design the back → saved on the device → appears in the binder | Make 6 cards, reload, and they're still in the binder | ✅ Done |
 | **M5: Card effects** | Tap to lift and flip a card, tilt + glare, holo foil | Cards feel like real objects | ✅ Done |
-| **M6: More merch** | Badges, polaroids, acrylic stands | Make one of each from your photos | ⬜ |
+| **M6: More merch** | Badges with 流麻 fills, polaroids with 合拍 layouts, the My stuff shelf (+ a prettier holo foil) | Make one of each from your photos | ⬜ |
 | **M7: Decorate** | DIY binder cover, DIY card backs (your own image, stickers), a journal page or ita bag display | A page you'd be proud to show | ⬜ |
 | **M8: Share** | Export images and page-flip videos | Post one to social media straight from the app | ⬜ |
 | **M9: Unboxing mini-game** *(optional)* | Seal cards in an envelope/album, then unbox them | Opening feels like a ritual | ⬜ |
@@ -139,11 +139,26 @@ Card {
   createdAt: Date
 }
 
-Merch {                   // M6
+Badge {                   // M6, stored in "merch"
   id: string
-  kind: "badge" | "polaroid" | "stand" | "sticker"
-  image: Blob
-  caption?: string
+  kind: "badge"
+  image: Blob             // the round photo, saved square (600 × 600)
+  source: Blob            // smaller copy of the original, for re-cropping
+  crop: { zoom, x, y }
+  fill: "none" | "glitter" | "snow" | "stars" | "hearts" | "sakura"   // 流麻
+  rim: string             // rim color
+  seed: number            // so the floating pieces settle the same way every time
+}
+
+Polaroid {                // M6, stored in "merch"
+  id: string
+  kind: "polaroid"
+  layout: "single" | "side" | "stack"   // side / stack = 合拍 (two photos)
+  frame: string           // frame color
+  image: Blob             // the photo area with every photo in its place
+  photos: { source: Blob, crop: { zoom, x, y } }[]
+  caption?: Blob          // handwriting on the bottom strip (transparent PNG)
+  pen?: string
 }
 
 Binder {
@@ -196,6 +211,7 @@ Only if Phase 1 shows people want it, and one step at a time:
 | **Small circles** | Shared binders or collections for a group of friends in the same fandom. |
 | **Online fan event** | Creators' booths with free limited items (无料): numbered copies ("No. 023 / 100"), creator notes, time-limited. |
 | **Fan creations** | Fan artists turn their own artwork into collectible cards, with permissions they choose (collect, download, remix). |
+| **Acrylic stands** | Cut the person out of a photo on the device and stand it on a clear acrylic base. |
 | **Native iOS app** | Real haptics, a Photos share-sheet "Add to Pocket Fandom", depth data from Portrait photos. |
 
 These need accounts, a backend and content moderation, so they're deliberately out of Phase 1.
