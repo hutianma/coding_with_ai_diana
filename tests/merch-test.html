@@ -11,10 +11,9 @@
 <iframe id="f" style="width:390px;height:844px;border:0"></iframe>
 <pre id="out">running…</pre>
 <script type="module">
-import { createShaker } from '/src/merch/shaker.js';
+import { createShaker, FILLS } from '/src/merch/shaker.js';
 import { polaroidSizes, LAYOUTS } from '/src/merch/Polaroid.js';
 import { screenGravity, screenAcceleration, deviceGravity, tiltBetween, recenter } from '/src/merch/motion.js';
-import { FILLS } from '/src/merch/shaker.js';
 
 const out = document.getElementById('out');
 const results = [];
@@ -131,6 +130,20 @@ try {
     const d = globe.getContext('2d').getImageData(x, y, 300, 300).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n;
   });
   check('after a shake, pieces are in every quarter of the badge', quarters.every((n) => n > 200), quarters.join(' / '));
+
+  // After a shake, everything comes completely to rest (so the animation stops and saves
+  // battery): within 20 s, even the slow gold dust
+  for (const fill of FILLS.map((f) => f.value).filter((f) => f !== 'none')) {
+    const still = document.createElement('canvas'); still.width = still.height = 600;
+    const sh = createShaker(still, { fill, seed: 21 });
+    sh.settle(900); sh.stop();
+    sh.shake(); sh.stop();
+    sh.advance(20);
+    const moving = !sh.isSettled;
+    let frames = 20;
+    while (!sh.isSettled && frames < 1200) { sh.advance(10); frames += 10; }
+    check(`${fill}: moves when shaken, then comes completely to rest`, moving && sh.isSettled, `${(frames / 60).toFixed(1)} s`);
+  }
 
   // Gold dust: lots of fine flecks
   check('there is a Gold dust fill', FILLS.some((f) => f.value === 'gold'));
