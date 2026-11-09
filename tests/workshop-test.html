@@ -1,0 +1,183 @@
+<!--
+  Automated photocard-workshop tests (M4).
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/workshop-test.html  → every line should say PASS.
+  Uses made-up test pictures (colored shapes), never real photos.
+  Note: this deletes the app's saved cards on this browser (localhost only).
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Workshop tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script type="module">
+import { placement, clampCrop, zoomCrop, panCrop } from '/src/workshop/crop.js';
+import { newBinder, placeInNextPocket } from '/src/storage/collection.js';
+import { CARD_WIDTH, CARD_HEIGHT } from '/src/workshop/imageTools.js';
+
+const out = document.getElementById('out');
+const results = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+const near = (a, b, eps = 0.5) => Math.abs(a - b) <= eps;
+let win, doc;
+
+// A made-up test picture: a colored background with a white circle
+function testPicture(w, h, hue, name) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = `hsl(${hue} 70% 60%)`; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(w / 2, h / 2, Math.min(w, h) / 4, 0, 7); g.fill();
+  return new Promise((r) => c.toBlob((b) => r(new File([b], name, { type: 'image/png' })), 'image/png'));
+}
+
+async function load(q = '') {
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?' + q; });
+  win = f.contentWindow; doc = win.document;
+  // Wait for the binder (saved data loads first)
+  for (let i = 0; i < 200 && !doc.querySelector('.book'); i++) await wait(50);
+}
+
+async function until(test, ms = 8000) {
+  for (let t = 0; t < ms; t += 50) { if (test()) return true; await wait(50); }
+  return false;
+}
+
+// Choose photos in the "＋ New card" file picker
+async function choosePhotos(files) {
+  doc.querySelector('[data-action="new"]').click();
+  const input = doc.querySelector('input[type=file]');
+  const dt = new win.DataTransfer();
+  for (const file of files) dt.items.add(new win.File([file], file.name, { type: file.type }));
+  input.files = dt.files;
+  input.dispatchEvent(new win.Event('change'));
+  await until(() => doc.querySelector('.workshop .crop__img')?.complete && doc.querySelector('.crop__img').naturalWidth > 0);
+  await wait(100);
+}
+
+const dialog = () => doc.querySelector('dialog.workshop[open]');
+const primary = () => doc.querySelector('.workshop__primary');
+const title = () => doc.querySelector('.workshop__title')?.textContent;
+const label = () => doc.querySelector('.page-nav__label').textContent;
+const photoCards = () => doc.querySelectorAll('.leaf:not([hidden]) .card--photo').length;
+
+try {
+  // ---------- Crop maths ----------
+  const img = { width: 2000, height: 1000 }; // a wide photo
+  const frame = { width: 110, height: 170 };
+  let box = placement(img, frame, { zoom: 1, x: 0, y: 0 });
+  check('crop: zoom 1 exactly covers the frame height', near(box.height, 170) && box.width >= 110, JSON.stringify(box));
+  let c = clampCrop(img, frame, { zoom: 1, x: 5, y: 5 });
+  box = placement(img, frame, c);
+  check('crop: dragging too far never leaves a gap', box.left <= 0.01 && box.left + box.width >= 109.99 && near(box.top, 0), JSON.stringify(box));
+  c = zoomCrop(img, frame, { zoom: 1, x: 0, y: 0 }, 2, 30, 40);
+  const before = placement(img, frame, { zoom: 1, x: 0, y: 0 });
+  box = placement(img, frame, c);
+  const u0 = (30 - before.left) / before.width, u1 = (30 - box.left) / box.width;
+  check('crop: zooming keeps the pinch point under the fingers', near(u0, u1, 0.002) && c.zoom === 2, `${u0} vs ${u1}`);
+  check('crop: zoom stays between 1 and 5', zoomCrop(img, frame, c, 100).zoom === 5 && zoomCrop(img, frame, c, 0.01).zoom === 1);
+  const sameAtTwoSizes = (() => {
+    const crop = panCrop(img, frame, { zoom: 1.7, x: 0, y: 0 }, 12, -8);
+    const a = placement(img, frame, crop), b = placement(img, { width: 600, height: 600 * 170 / 110 }, crop);
+    return near(a.left / frame.width, b.left / 600, 0.001);
+  })();
+  check('crop: the saved card matches what you saw on screen', sameAtTwoSizes);
+
+  // ---------- Pockets ----------
+  const binder = newBinder();
+  const pages = ['a', 'b', 'c', 'd', 'e'].map((id) => placeInNextPocket(binder, id));
+  check('5th card starts a new page', pages.join() === '1,1,1,1,2' && binder.pages.length === 2, pages.join());
+
+  // ---------- The workshop, end to end ----------
+  f.src = 'about:blank'; await wait(100);
+  await new Promise((r) => { const req = indexedDB.deleteDatabase('pocket-fandom'); req.onsuccess = req.onerror = req.onblocked = r; setTimeout(r, 1500); });
+
+  await load('');
+  check('first visit: sample cards with a hint', !!doc.querySelector('.notice') && label() === 'Cover', doc.querySelector('.notice')?.textContent);
+
+  const photos = [await testPicture(1200, 900, 330, 'a.png'), await testPicture(800, 1400, 200, 'b.png')];
+  await choosePhotos(photos);
+  check('choosing 2 photos opens the workshop', !!dialog() && title() === 'New card (1 of 2)', title());
+  const shown = doc.querySelector('.crop__img');
+  check('the photo shows in the crop frame', shown.complete && shown.naturalWidth === 1200, `naturalWidth ${shown.naturalWidth}`);
+
+  // Drag the photo a little, then zoom with the slider
+  const area = doc.querySelector('.crop');
+  const r = area.getBoundingClientRect();
+  const pe = (type, x) => area.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 9, isPrimary: true, clientX: x, clientY: r.top + r.height / 2 }));
+  await until(() => doc.querySelector('.crop__img').style.left);
+  const left0 = parseFloat(doc.querySelector('.crop__img').style.left);
+  pe('pointerdown', r.left + 150); pe('pointermove', r.left + 120); pe('pointerup', r.left + 120);
+  const left1 = parseFloat(doc.querySelector('.crop__img').style.left);
+  check('dragging moves the photo', left1 < left0, `${left0} → ${left1}`);
+  const zoom = doc.querySelector('.workshop__zoom input');
+  zoom.value = '2'; zoom.dispatchEvent(new win.Event('input'));
+  check('zoom slider zooms in', parseFloat(doc.querySelector('.crop__img').style.width) > 300);
+
+  primary().click(); await wait(300);
+  check('next: card back step', title() === 'Card back (1 of 2)' && primary().textContent === 'Save & next', title());
+  doc.querySelector('input[name="back-color"][value="#cfe3ff"]').click();
+  doc.querySelector('input[name="back-pattern"][value="stripes"]').click();
+  const text = doc.querySelector('.workshop__text input');
+  text.value = '<b>Mina</b> 2026'; text.dispatchEvent(new win.Event('input'));
+  const backEl = doc.querySelector('.back-preview__back .card-back');
+  check('back preview shows color, pattern and text (as plain text)',
+    backEl.classList.contains('card-back--stripes') && backEl.textContent === '<b>Mina</b> 2026' && !backEl.querySelector('b'));
+
+  primary().click();
+  await until(() => title() === 'New card (2 of 2)');
+  check('save & next → second photo', title() === 'New card (2 of 2)', title());
+  primary().click(); await wait(300);
+  const color2 = doc.querySelector('input[name="back-color"]:checked')?.value;
+  check('second card starts with the same back', color2 === '#cfe3ff', color2);
+  primary().click();
+  await until(() => !dialog());
+  await until(() => photoCards() === 2);
+
+  check('both cards are in the binder, on page 1', photoCards() === 2 && label() === 'Page 1 of 1', `${photoCards()} cards, ${label()}`);
+  check('the sample hint is gone', !doc.querySelector('.notice:not(.notice--warning)'));
+
+  // Saved image size
+  const front = doc.querySelector('.card--photo img');
+  await until(() => front.complete && front.naturalWidth > 0);
+  check(`saved card is ${CARD_WIDTH}×${CARD_HEIGHT}`, front.naturalWidth === CARD_WIDTH && front.naturalHeight === CARD_HEIGHT, `${front.naturalWidth}×${front.naturalHeight}`);
+
+  // ---------- My cards: edit & delete ----------
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  check('My cards lists both cards', doc.querySelectorAll('.my-cards__item').length === 2);
+  doc.querySelector('.my-cards__item [data-action="edit"]').click();
+  await until(() => doc.querySelector('.workshop .crop__img')?.naturalWidth > 0);
+  check('edit opens the workshop on that card', title() === 'Edit card', title());
+  primary().click();
+  await until(() => title() === 'Card back');
+  const t2 = doc.querySelector('.workshop__text input');
+  check('edit remembers the card back text', t2.value === '<b>Mina</b> 2026', t2.value);
+  t2.value = 'Edited'; t2.dispatchEvent(new win.Event('input'));
+  primary().click();
+  await until(() => !dialog());
+  await wait(200);
+  check('edited card stays in place (no extra card)', photoCards() === 2, photoCards());
+
+  win.confirm = () => true;
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  doc.querySelectorAll('.my-cards__item [data-action="delete"]')[1].click();
+  await until(() => doc.querySelectorAll('.my-cards__item').length === 1);
+  check('delete removes the card', doc.querySelectorAll('.my-cards__item').length === 1);
+  doc.querySelector('.my-cards__close').click(); await wait(200);
+  check('binder has 1 card left', photoCards() === 1, photoCards());
+
+  // ---------- After a reload ----------
+  await load('open');
+  if (doc.querySelector('.notice--warning')) {
+    results.push('SKIP saved after reload: this browser blocks saving (in-memory mode), so persistence must be checked in a real browser');
+  } else {
+    check('the card is still there after reloading', photoCards() === 1, photoCards());
+  }
+
+  check('no errors on the page', !doc.querySelector('[role=alert]:not(.notice--warning):not([hidden])'));
+} catch (e) {
+  results.push('ERROR ' + e.stack);
+}
+out.textContent = results.join('\n');
+out.dataset.done = 1;
+</script>
