@@ -1,0 +1,202 @@
+<!--
+  Automated card-effects tests (M5): picking up, flipping and tilting cards,
+  signatures and finishes.
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/effects-test.html  → every line should say PASS.
+  Uses made-up test pictures (colored shapes), never real photos.
+  Note: this deletes the app's saved cards on this browser (localhost only).
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Card effects tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script type="module">
+const out = document.getElementById('out');
+const results = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+let win, doc;
+
+async function until(test, ms = 8000) {
+  for (let t = 0; t < ms; t += 50) { if (test()) return true; await wait(50); }
+  return false;
+}
+
+async function load(q) {
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?' + q; });
+  win = f.contentWindow; doc = win.document;
+  await until(() => doc.querySelector('.book'), 20000);
+  // Animations run on a fake clock so tilting is instant and predictable
+  let now = 0;
+  win.performance.now = () => now;
+  win.requestAnimationFrame = (cb) => setTimeout(() => { now += 50; cb(now); }, 1);
+  win.cancelAnimationFrame = () => {};
+}
+
+const viewer = () => doc.querySelector('dialog.viewer[open]');
+const viewerCard = () => doc.querySelector('.viewer__card');
+const visibleCards = () => doc.querySelectorAll('.leaf:not([hidden]) .leaf__face:not([inert]) .card[data-card-id]');
+const angleY = () => Number(viewerCard().style.transform.match(/rotateY\((-?[\d.]+)deg\)/)?.[1]);
+const angleX = () => Number(viewerCard().style.transform.match(/rotateX\((-?[\d.]+)deg\)/)?.[1]);
+
+function testPicture(hue) {
+  const c = document.createElement('canvas'); c.width = 900; c.height = 1300;
+  const g = c.getContext('2d'); g.fillStyle = `hsl(${hue} 70% 60%)`; g.fillRect(0, 0, 900, 1300);
+  return new Promise((r) => c.toBlob((b) => r(new File([b], 'p.png', { type: 'image/png' })), 'image/png'));
+}
+
+try {
+  // ---------- Picking up a card (sample binder) ----------
+  await load('demo&open');
+  const label = () => doc.querySelector('.page-nav__label').textContent;
+  check('cards in the binder can be picked up (buttons)', visibleCards().length === 4 && visibleCards()[0].getAttribute('role') === 'button');
+
+  visibleCards()[1].click(); await wait(300);
+  check('tapping a card lifts it out', !!viewer() && doc.activeElement === viewerCard());
+  check('it shows the front first', angleY() === 0 && viewerCard().getAttribute('aria-pressed') === 'false', viewerCard().style.transform);
+  check('no "turn on tilt" button on a computer', doc.querySelector('.viewer__motion').hidden);
+
+  doc.querySelector('.viewer__flip').click(); await wait(100);
+  check('Flip shows the back', angleY() === 180 && viewerCard().getAttribute('aria-pressed') === 'true', viewerCard().style.transform);
+
+  const r = viewerCard().getBoundingClientRect();
+  const pe = (type, x) => viewerCard().dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 5, isPrimary: true, clientX: x, clientY: r.top + r.height / 2 }));
+  pe('pointerdown', r.left + r.width / 2); pe('pointerup', r.left + r.width / 2); await wait(100);
+  check('tapping the card flips it back', angleY() === 360 && viewerCard().getAttribute('aria-pressed') === 'false', viewerCard().style.transform);
+
+  pe('pointerdown', r.left + 40); pe('pointermove', r.left + 80); pe('pointermove', r.left + 120);
+  const mid = angleY();
+  check('dragging sideways turns the card with the finger', mid > 360 && mid < 540, mid);
+  pe('pointermove', r.left + 400); pe('pointerup', r.left + 400); await wait(100);
+  check('letting go settles on the nearest side', angleY() % 180 === 0, angleY());
+
+  const beforeEnter = angleY();
+  viewerCard().dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await wait(100);
+  check('Enter flips the card too', angleY() === beforeEnter + 180, `${beforeEnter} → ${angleY()}`);
+
+  // Tilt with the mouse (computers)
+  doc.querySelector('.viewer__stage').dispatchEvent(new win.PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse', clientX: r.right - 5, clientY: r.top + 5 }));
+  await wait(1500);
+  const mx = parseFloat(viewerCard().style.getPropertyValue('--mx'));
+  check('moving the mouse tilts the card and moves the shine', Math.abs(angleX()) > 5 && mx > 80, `rotateX ${angleX()} / --mx ${mx}`);
+
+  // Arrow keys don't turn the binder behind the card
+  const before = label();
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight' })); await wait(300);
+  check('arrow keys don\'t turn pages while a card is out', label() === before, `${before} → ${label()}`);
+
+  doc.querySelector('.viewer__close').click();
+  await until(() => !viewer(), 3000); await wait(200);
+  check('"Put back" closes it and focus returns to the card', !viewer() && doc.activeElement?.dataset.cardId === visibleCards()[1].dataset.cardId, doc.activeElement?.className);
+
+  // Keyboard: focus a card, press Enter, Esc to put back
+  visibleCards()[0].focus();
+  visibleCards()[0].dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await wait(300);
+  check('Enter on a card in the binder picks it up', !!viewer());
+  viewer().dispatchEvent(new win.Event('cancel', { cancelable: true }));
+  await until(() => !viewer(), 3000);
+  check('Esc puts it back', !viewer());
+
+  // A drag that turns the page must not also pick up a card
+  const book = doc.querySelector('.book').getBoundingClientRect();
+  const y = book.top + book.height * 0.3, x = book.left + book.width * 0.75;
+  const bp = (type, px) => (type === 'pointerdown' ? doc.elementFromPoint(px, y) : doc.querySelector('.book'))
+    .dispatchEvent(new win.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 6, isPrimary: true, pointerType: 'touch', clientX: px, clientY: y }));
+  bp('pointerdown', x);
+  for (let i = 1; i <= 8; i++) { await wait(30); bp('pointermove', x - i * 30); }
+  await wait(150); bp('pointerup', x - 240);
+  doc.elementFromPoint(x, y)?.click(); // the click a browser fires after a drag
+  await wait(800);
+  check('dragging a page over a card doesn\'t pick the card up', !viewer() && label() === 'Page 2 of 4', label());
+
+  // ---------- Signature & finish in the workshop ----------
+  f.src = 'about:blank'; await wait(100);
+  await new Promise((res) => { const q = indexedDB.deleteDatabase('pocket-fandom'); q.onsuccess = q.onerror = q.onblocked = res; setTimeout(res, 1500); });
+  await load('');
+  doc.querySelector('[data-action="new"]').click();
+  const input = doc.querySelector('input[type=file]');
+  const dt = new win.DataTransfer();
+  const pic = await testPicture(280);
+  dt.items.add(new win.File([pic], 'p.png', { type: 'image/png' }));
+  input.files = dt.files; input.dispatchEvent(new win.Event('change'));
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  const title = () => doc.querySelector('.workshop__title').textContent;
+  doc.querySelector('.workshop__primary').click(); await wait(200);
+  check('after cropping comes the signature step', title() === 'Sign it (optional)', title());
+
+  const pad = doc.querySelector('.sign__pad');
+  const pr = pad.getBoundingClientRect();
+  const sp = (type, fx, fy) => pad.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 7, isPrimary: true, clientX: pr.left + fx * pr.width, clientY: pr.top + fy * pr.height }));
+  doc.querySelector('input[name="pen"][value="#ffffff"]').click();
+  sp('pointerdown', 0.2, 0.7); for (let i = 1; i <= 10; i++) sp('pointermove', 0.2 + i * 0.05, 0.7 - (i % 2) * 0.05); sp('pointerup', 0.7, 0.7);
+  const ink = pad.getContext('2d').getImageData(0, 0, pad.width, pad.height).data.some((v, i) => i % 4 === 3 && v > 0);
+  check('drawing leaves ink on the card', ink);
+
+  doc.querySelector('.workshop__primary').click(); await wait(300);
+  check('then the card back & finish step', title() === 'Card back & finish', title());
+  check('the preview shows the signature', !doc.querySelector('.back-preview__sig').hidden);
+  doc.querySelector('input[name="finish"][value="holo"]').click();
+  check('choosing Holo previews the holo finish', doc.querySelector('.back-preview__front').dataset.finish === 'holo');
+  doc.querySelector('.workshop__primary').click();
+  await until(() => !doc.querySelector('dialog.workshop[open]'));
+  doc.querySelector('.cover-face').click(); await wait(1000);
+  const saved = visibleCards()[0];
+  check('the saved card is holo and signed in the binder',
+    saved?.classList.contains('card--holo') && !!saved.querySelector('.card__signature') && /signed/.test(saved.getAttribute('aria-label')),
+    saved?.className);
+
+  saved.click(); await wait(300);
+  check('a picked-up holo card has the rainbow layer', doc.querySelector('.viewer').classList.contains('viewer--holo')
+    && getComputedStyle(doc.querySelector('.viewer__holo')).display === 'block');
+  doc.querySelector('.viewer__close').click(); await until(() => !viewer(), 3000);
+
+  // Edit: the signature is kept unless cleared
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  doc.querySelector('.my-cards__item [data-action="edit"]').click();
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  doc.querySelector('.workshop__primary').click(); await wait(400);
+  const kept = doc.querySelector('.sign__pad').getContext('2d').getImageData(0, 0, 600, 928).data.some((v, i) => i % 4 === 3 && v > 0);
+  check('editing shows the existing signature', kept);
+  doc.querySelector('.sign__clear').click();
+  doc.querySelector('.workshop__primary').click(); await wait(300);
+  check('after Clear the preview has no signature', doc.querySelector('.back-preview__sig').hidden);
+  doc.querySelector('input[name="finish"][value="matte"]').click();
+  doc.querySelector('.workshop__primary').click();
+  await until(() => !doc.querySelector('dialog.workshop[open]')); await wait(300);
+  const edited = visibleCards()[0];
+  check('saved: no signature, matte finish', edited && !edited.querySelector('.card__signature') && edited.classList.contains('card--matte'), edited?.className);
+
+  // ---------- A batch where you don't move the crop keeps each photo ----------
+  doc.querySelector('[data-action="new"]').click();
+  const input3 = doc.querySelector('input[type=file]');
+  const dt3 = new win.DataTransfer();
+  for (const hue of [0, 120]) dt3.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));
+  input3.files = dt3.files; input3.dispatchEvent(new win.Event('change'));
+  for (let i = 0; i < 2; i++) {
+    await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0 && title().startsWith('New card'));
+    await wait(100);
+    doc.querySelector('.workshop__primary').click(); await wait(300); // crop untouched → sign
+    doc.querySelector('.workshop__primary').click(); await wait(600); // skip signing → back
+    doc.querySelector('.workshop__primary').click(); // save
+    await until(() => !doc.querySelector('dialog.workshop[open]') || title() === 'New card (2 of 2)');
+  }
+  await until(() => !doc.querySelector('dialog.workshop[open]')); await wait(300);
+  // Read the middle pixel of each saved card's photo
+  const hueOf = (img) => {
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const [r, gr, b] = g.getImageData(c.width / 2, c.height / 2, 1, 1).data;
+    return r > gr ? 'red' : 'green';
+  };
+  const photos = [...doc.querySelectorAll('.card__photo')];
+  await until(() => photos.every((p) => p.complete && p.naturalWidth));
+  const hues = photos.slice(-2).map(hueOf);
+  check('2 cards in a row with untouched crops each keep their own photo', hues.join() === 'red,green', hues.join());
+} catch (e) {
+  results.push('ERROR ' + e.stack);
+}
+out.textContent = results.join('\n');
+out.dataset.done = 1;
+</script>

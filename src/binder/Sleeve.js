@@ -1,4 +1,4 @@
-import { createCard } from '../cards/Card.js';
+import { createCard, cardName } from '../cards/Card.js';
 
 // One clear plastic pocket. Holds a card, or nothing.
 export function createPocket(card) {
@@ -6,7 +6,13 @@ export function createPocket(card) {
   pocket.className = 'pocket';
 
   if (card) {
-    pocket.append(createCard(card));
+    // The card can be picked up (see Binder.js): tap it, or focus it and press Enter
+    const el = createCard(card);
+    el.dataset.cardId = card.id;
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `Pick up ${cardName(card)}`);
+    pocket.append(el);
   } else {
     pocket.classList.add('pocket--empty');
     pocket.setAttribute('role', 'img');

@@ -116,7 +116,9 @@ try {
   check('zoom slider zooms in', parseFloat(doc.querySelector('.crop__img').style.width) > 300);
 
   primary().click(); await wait(300);
-  check('next: card back step', title() === 'Card back (1 of 2)' && primary().textContent === 'Save & next', title());
+  check('next: signature step (optional)', title() === 'Sign it (optional) (1 of 2)', title());
+  primary().click(); await wait(300); // skip signing
+  check('next: card back step', title() === 'Card back & finish (1 of 2)' && primary().textContent === 'Save & next', title());
   doc.querySelector('input[name="back-color"][value="#cfe3ff"]').click();
   doc.querySelector('input[name="back-pattern"][value="stripes"]').click();
   const text = doc.querySelector('.workshop__text input');
@@ -129,6 +131,7 @@ try {
   await until(() => title() === 'New card (2 of 2)');
   check('save & next → second photo', title() === 'New card (2 of 2)', title());
   primary().click(); await wait(300);
+  primary().click(); await wait(300); // skip signing
   const color2 = doc.querySelector('input[name="back-color"]:checked')?.value;
   check('second card starts with the same back', color2 === '#cfe3ff', color2);
   primary().click();
@@ -149,8 +152,9 @@ try {
   doc.querySelector('.my-cards__item [data-action="edit"]').click();
   await until(() => doc.querySelector('.workshop .crop__img')?.naturalWidth > 0);
   check('edit opens the workshop on that card', title() === 'Edit card', title());
-  primary().click();
-  await until(() => title() === 'Card back');
+  primary().click(); await wait(300);
+  primary().click(); // skip signing
+  await until(() => title() === 'Card back & finish');
   const t2 = doc.querySelector('.workshop__text input');
   check('edit remembers the card back text', t2.value === '<b>Mina</b> 2026', t2.value);
   t2.value = 'Edited'; t2.dispatchEvent(new win.Event('input'));

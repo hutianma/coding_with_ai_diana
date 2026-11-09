@@ -1,10 +1,14 @@
 // The photocard workshop: pick photos → frame each one → design the back → save.
 import { DEFAULT_CROP, MAX_ZOOM, placement, clampCrop, panCrop, zoomCrop } from './crop.js';
-import { loadImage, unloadImage, shrinkSource, renderCardFront } from './imageTools.js';
+import { loadImage, unloadImage, shrinkSource, renderCardFront, CARD_WIDTH, CARD_HEIGHT } from './imageTools.js';
+import { FINISHES } from '../cards/Card.js';
+import { createSignaturePad, PEN_COLORS } from './SignaturePad.js';
 import { BACK_COLORS, BACK_PATTERNS, BACK_TEXT_MAX, DEFAULT_BACK, createCardBack } from '../cards/CardBack.js';
 import { makeId } from '../storage/ids.js';
 
 let lastBack = { ...DEFAULT_BACK }; // a batch of new cards starts with the previous card's back
+let lastFinish = 'glossy'; // …and finish
+let lastPen = PEN_COLORS[0].value; // …and signature pen
 
 // Ask for photos, then make a card from each.
 // onSave(card) is called for every finished card and must save it.
@@ -56,11 +60,36 @@ export function openWorkshop({ files, existing = null, onSave }) {
       <p class="workshop__hint">Drag to move · pinch or scroll to zoom</p>
     </section>
 
+    <section class="workshop__step" data-step="sign" hidden>
+      <div class="sign">
+        <img class="sign__front" alt="Card front">
+        <canvas class="sign__pad" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" aria-label="Signature area: draw with your finger or mouse"></canvas>
+      </div>
+      <fieldset class="patterns pens">
+        <legend>Pen</legend>
+        ${PEN_COLORS.map((c) => `
+          <label class="pattern pen" style="--pen:${c.value}">
+            <input type="radio" name="pen" value="${c.value}">
+            <span>${c.name}</span>
+          </label>`).join('')}
+        <button class="pattern sign__clear" type="button">Clear</button>
+      </fieldset>
+      <p class="workshop__hint">Sign on the front, like a real signed photocard. You can skip this.</p>
+    </section>
+
     <section class="workshop__step" data-step="back" hidden>
       <div class="back-preview">
-        <div class="back-preview__front"><img alt="Card front"></div>
+        <div class="back-preview__front"><img alt="Card front"><canvas class="back-preview__sig" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" aria-hidden="true"></canvas></div>
         <div class="back-preview__back"></div>
       </div>
+      <fieldset class="patterns finishes">
+        <legend>Finish</legend>
+        ${FINISHES.map((f) => `
+          <label class="pattern">
+            <input type="radio" name="finish" value="${f.value}">
+            <span>${f.name}</span>
+          </label>`).join('')}
+      </fieldset>
       <fieldset class="swatches">
         <legend>Color</legend>
         ${BACK_COLORS.map((c) => `
@@ -103,14 +132,18 @@ export function openWorkshop({ files, existing = null, onSave }) {
   const secondary = $('.workshop__secondary');
   const backPreview = $('.back-preview__back');
   const frontPreview = $('.back-preview__front img');
+  const sigPreview = $('.back-preview__sig');
+  const signFront = $('.sign__front');
+  const pad = createSignaturePad($('.sign__pad'));
 
   let index = 0; // which photo we're on
   let step = 'crop';
   let image = null; // the loaded <img>
   let crop = { ...DEFAULT_CROP };
   let back = existing ? { ...existing.back } : { ...lastBack };
+  let finish = existing?.finish ?? lastFinish;
   let previewUrl = null;
-  let preview = null; // { blob, cropKey }: the front drawn for the back step, reused when saving
+  let preview = null; // { blob, image, cropKey }: the front drawn for the sign/back steps, reused when saving
   let skipped = 0; // photos that couldn't be opened
   let busy = false;
 
@@ -121,6 +154,8 @@ export function openWorkshop({ files, existing = null, onSave }) {
     setBusy(true);
     unloadImage(image);
     image = null;
+    preview = null; // never reuse the previous photo's front
+    previewToken++; // and ignore a preview of it that's still being drawn
     try {
       image = await loadImage(files[i]);
     } catch {
@@ -135,6 +170,13 @@ export function openWorkshop({ files, existing = null, onSave }) {
     showError(skipped ? `${skipped} photo${skipped > 1 ? 's' : ''} couldn't be opened and ${skipped > 1 ? 'were' : 'was'} skipped. Try JPEG or PNG.` : '');
     crop = existing?.crop ? { ...existing.crop } : { ...DEFAULT_CROP };
     cropImg.src = image.src;
+    try {
+      await pad.reset(existing?.signature ?? null);
+    } catch {
+      await pad.reset(null);
+      showError("The saved signature couldn't be opened, so it was cleared. You can sign again.");
+    }
+    pad.setColor(existing?.pen ?? lastPen);
     showStep('crop');
   }
 
@@ -145,11 +187,18 @@ export function openWorkshop({ files, existing = null, onSave }) {
     if (name === 'crop') {
       title.textContent = (existing ? 'Edit card' : 'New card') + counter;
       secondary.textContent = 'Cancel';
-      primary.textContent = 'Next: card back';
+      primary.textContent = 'Next: signature';
       drawCrop(); // place the photo right away (no flash of an unplaced photo)…
       requestAnimationFrame(drawCrop); // …and again once the layout has settled
+    } else if (name === 'sign') {
+      title.textContent = 'Sign it (optional)' + counter;
+      secondary.textContent = 'Back';
+      primary.textContent = 'Next: card back';
+      const checked = dialog.querySelector(`input[name="pen"][value="${pad.color}"]`);
+      if (checked) checked.checked = true;
+      drawFrontPreview();
     } else {
-      title.textContent = 'Card back' + counter;
+      title.textContent = 'Card back & finish' + counter;
       secondary.textContent = 'Back';
       primary.textContent = index + 1 < files.length ? 'Save & next' : 'Save card';
       drawBackStep();
@@ -193,23 +242,41 @@ export function openWorkshop({ files, existing = null, onSave }) {
   let previewToken = 0;
 
   async function drawBackStep() {
+    const finishInput = dialog.querySelector(`input[name="finish"][value="${finish}"]`);
+    if (finishInput) finishInput.checked = true;
+    $('.back-preview__front').dataset.finish = finish;
+    pad.copyTo(sigPreview); // a cheap copy of the signature for the preview
+    sigPreview.hidden = !pad.hasInk;
     const colorInput = dialog.querySelector(`input[name="back-color"][value="${back.color}"]`);
     if (colorInput) colorInput.checked = true;
     const patternInput = dialog.querySelector(`input[name="back-pattern"][value="${back.pattern}"]`);
     if (patternInput) patternInput.checked = true;
     textInput.value = back.text ?? '';
     drawBack();
+    drawFrontPreview();
+  }
 
-    // A preview of the front, drawn the same way it will be saved
-    const token = ++previewToken;
-    frontPreview.removeAttribute('src');
+  // A preview of the front, drawn the same way it will be saved (shared by the
+  // signature and back steps, and reused when saving)
+  async function drawFrontPreview() {
     const cropKey = JSON.stringify(crop);
-    const blob = await renderCardFront(image, crop);
-    if (token !== previewToken) return; // a newer preview has started
-    preview = { blob, cropKey };
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = URL.createObjectURL(blob);
-    frontPreview.src = previewUrl;
+    if (!previewMatches()) {
+      const token = ++previewToken;
+      const forImage = image;
+      frontPreview.removeAttribute('src');
+      signFront.removeAttribute('src');
+      const blob = await renderCardFront(forImage, crop);
+      if (token !== previewToken) return; // a newer preview (or photo) has started
+      preview = { blob, image: forImage, cropKey };
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(blob);
+    }
+    frontPreview.src = signFront.src = previewUrl;
+  }
+
+  // Is the stored preview exactly this photo with this crop?
+  function previewMatches() {
+    return preview?.image === image && preview.cropKey === JSON.stringify(crop);
   }
 
   function drawBack() {
@@ -220,10 +287,11 @@ export function openWorkshop({ files, existing = null, onSave }) {
     setBusy(true);
     showError('');
     try {
-      const reuse = preview?.cropKey === JSON.stringify(crop);
-      const [front, source] = await Promise.all([
+      const reuse = previewMatches();
+      const [front, source, signature] = await Promise.all([
         reuse ? preview.blob : renderCardFront(image, crop),
         existing ? existing.source : shrinkSource(image),
+        pad.changed ? pad.toBlob() : (existing?.signature ?? null),
       ]);
       const card = {
         id: existing?.id ?? makeId('card'),
@@ -232,10 +300,16 @@ export function openWorkshop({ files, existing = null, onSave }) {
         source,
         crop,
         back: { ...back },
-        finish: existing?.finish ?? 'glossy',
+        finish,
+        signature,
+        pen: pad.color,
       };
       await onSave(card, existing);
-      if (!existing) lastBack = { ...back };
+      if (!existing) {
+        lastBack = { ...back };
+        lastFinish = finish;
+        lastPen = pad.color;
+      }
     } catch (err) {
       setBusy(false);
       showError(`Couldn't save this card. ${err.message ?? ''}`.trim());
@@ -269,12 +343,14 @@ export function openWorkshop({ files, existing = null, onSave }) {
 
   primary.addEventListener('click', () => {
     if (busy || !image) return;
-    if (step === 'crop') showStep('back');
+    if (step === 'crop') showStep('sign');
+    else if (step === 'sign') showStep('back');
     else save();
   });
   secondary.addEventListener('click', () => {
     if (busy) return;
-    if (step === 'back') showStep('crop');
+    if (step === 'back') showStep('sign');
+    else if (step === 'sign') showStep('crop');
     else close();
   });
   $('.workshop__close').addEventListener('click', () => {
@@ -288,8 +364,14 @@ export function openWorkshop({ files, existing = null, onSave }) {
   dialog.addEventListener('change', (event) => {
     if (event.target.name === 'back-color') back.color = event.target.value;
     if (event.target.name === 'back-pattern') back.pattern = event.target.value;
+    if (event.target.name === 'pen') pad.setColor(event.target.value);
+    if (event.target.name === 'finish') {
+      finish = event.target.value;
+      $('.back-preview__front').dataset.finish = finish;
+    }
     drawBack();
   });
+  $('.sign__clear').addEventListener('click', () => pad.clear());
   textInput.addEventListener('input', () => {
     back.text = textInput.value.slice(0, BACK_TEXT_MAX);
     drawBack();

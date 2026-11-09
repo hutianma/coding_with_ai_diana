@@ -1,0 +1,177 @@
+/* ---------- Card viewer: a card lifted out of its pocket ---------- */
+
+.viewer {
+  width: 100vw;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.viewer[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.viewer::backdrop {
+  background: rgba(30, 15, 25, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: viewer-fade 0.3s ease;
+}
+
+.viewer.is-closing::backdrop {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+@keyframes viewer-fade {
+  from { opacity: 0; }
+}
+
+.viewer__stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  perspective: 1400px;
+  min-height: 0;
+}
+
+.viewer__lift {
+  width: min(72vw, 320px, (100svh - 190px) * 55 / 85);
+  aspect-ratio: 55 / 85;
+  transform-origin: center;
+}
+
+.viewer__card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  --mx: 50%;
+  --my: 50%;
+  --tilt: 0;
+}
+
+.viewer__card.is-settling {
+  transition: transform 0.55s cubic-bezier(.3, .7, .2, 1);
+}
+
+.viewer__card:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: 14px;
+}
+
+.viewer__face {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  box-shadow: 0 24px 50px -12px rgba(20, 5, 15, 0.55);
+}
+
+.viewer__face--back {
+  transform: rotateY(180deg);
+}
+
+/* The card drawing fills the whole face here (in pockets it has a margin) */
+.viewer__face .card,
+.viewer__face .card-back {
+  inset: 0;
+  border-radius: 14px;
+}
+
+.viewer__face .card-back { position: absolute; }
+
+/* Shine: a soft light that slides with the tilt */
+.viewer__glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12) 35%, transparent 65%);
+  mix-blend-mode: soft-light;
+  opacity: calc(0.35 + var(--tilt) * 0.65);
+}
+
+.viewer--matte .viewer__glare { opacity: calc(0.1 + var(--tilt) * 0.2); }
+
+/* Holo foil: a rainbow that moves with the tilt (holo cards only) */
+.viewer__holo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+  background:
+    repeating-linear-gradient(115deg,
+      #ff7ac6 0%, #ffd36e 8%, #8cffb0 16%, #6ed8ff 24%, #b48cff 32%, #ff7ac6 40%);
+  background-size: 300% 300%;
+  background-position: var(--mx) var(--my);
+  mix-blend-mode: color-dodge;
+  opacity: calc(0.25 + var(--tilt) * 0.45);
+}
+
+.viewer--holo .viewer__holo { display: block; }
+
+/* The binder's still shimmer would double up with the moving one */
+.viewer__face .card--holo::after { display: none; }
+
+/* ---------- Buttons ---------- */
+
+.viewer__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px 20px;
+}
+
+.viewer__btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--chip-bg);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  cursor: pointer;
+}
+
+.viewer__flip {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* ---------- Reduce Motion: no 3D turning, the sides swap with a fade ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer::backdrop { animation: none; }
+
+  .viewer__card.is-settling { transition: none; }
+
+  .viewer__face--back {
+    transform: none;
+    opacity: 0;
+  }
+
+  .viewer__face {
+    transition: opacity 0.2s ease;
+  }
+
+  .viewer.is-back .viewer__face--back { opacity: 1; }
+  .viewer.is-back .viewer__face--front { opacity: 0; }
+
+  .viewer__holo { opacity: 0.35; }
+}
