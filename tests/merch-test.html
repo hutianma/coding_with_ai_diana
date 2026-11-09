@@ -155,6 +155,24 @@ try {
   doc.querySelectorAll('.polaroid-edit__add')[1].click(); await givePhoto(220);
   await until(() => doc.querySelectorAll('.polaroid-edit__cell.has-photo').length === 2);
   check('both photos chosen → Next works', !primary().disabled);
+
+  // "Change" sits on top of the photo: pressing it must not grab the photo
+  const cell1 = doc.querySelectorAll('.polaroid-edit__cell')[0];
+  const change = cell1.querySelector('.polaroid-edit__add');
+  const photoImg = cell1.querySelector('.crop__img');
+  const before = photoImg.style.left + photoImg.style.top;
+  const cr = change.getBoundingClientRect();
+  const cp = (type, d) => change.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 11, isPrimary: true, clientX: cr.left + 5 + d, clientY: cr.top + 5 + d }));
+  cp('pointerdown', 0); cp('pointermove', -40); cp('pointerup', -40);
+  const after = photoImg.style.left + photoImg.style.top;
+  check('pressing Change doesn\'t drag the photo', after === before, `${before} → ${after}`);
+  change.click();
+  check('Change opens the photo picker', !!doc.querySelector('input.photo-picker'));
+  await givePhoto(120);
+  await wait(400);
+  check('after Change the new photo is in that cell', await colorAt(cell1.querySelector('.crop__img'), 0.5, 0.5) === 'green');
+  // put the red photo back so the later checks still apply
+  cell1.querySelector('.polaroid-edit__add').click(); await givePhoto(0); await wait(400);
   primary().click(); await wait(300);
   check('then the caption step', title() === 'Caption' && !!doc.querySelector('.polaroid-caption__pad'), title());
   const pad = doc.querySelector('.polaroid-caption__pad');
