@@ -8,8 +8,11 @@ const phoneQuery = matchMedia('(max-width: 700px)');
 // tapping or dragging the cover, or with the arrows / ← → keys.
 // startPage: 0 = closed on the cover, 1+ = open at that page.
 export function mountBinder(root, binder, { startPage = 0 } = {}) {
+  // A binder always has at least one (empty) page, so it can be opened
+  const pages = binder.pages.length ? binder.pages : [emptyPage(binder.layout)];
+
   // The page you're looking at (kept when switching phone ↔ computer). 0 = cover.
-  let focusPage = clamp(Math.floor(startPage) || 0, 0, binder.pages.length);
+  let focusPage = clamp(Math.floor(startPage) || 0, 0, pages.length);
 
   const view = document.createElement('div');
   view.className = 'binder-view';
@@ -42,27 +45,36 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
 
   let flip = null;
   let paging = null;
-  let coverBtn = null;
+  let focusBefore = null; // what had keyboard focus when the last turn started
 
   function updateNav() {
-    label.textContent = pageLabel(paging.pagesShown(flip.current), binder.pages.length);
-    const closed = flip.current === 0;
-    backBtn.hidden = closed;
+    label.textContent = pageLabel(paging.pagesShown(flip.current), pages.length);
 
-    // Keep keyboard / VoiceOver focus on something that's still there
+    // If the arrow you're focused on gets disabled at the end, move focus to the other one
     const focused = document.activeElement;
     prevBtn.disabled = !flip.canPrev;
     nextBtn.disabled = !flip.canNext;
     if (focused?.disabled) (focused === prevBtn ? nextBtn : prevBtn).focus();
-    else if (focused === backBtn && closed) coverBtn?.focus();
-    else if (focused === coverBtn && !closed) nextBtn.focus();
+  }
+
+  // Once the pages are at rest (and hidden faces are inert), make sure keyboard /
+  // VoiceOver focus is on something that's still there
+  function onSettle(current) {
+    const closed = current === 0;
+    backBtn.hidden = closed;
+    const lost = !view.contains(document.activeElement) || document.activeElement.closest('[inert]') ||
+      (document.activeElement === backBtn && closed);
+    if (focusBefore && lost) {
+      (closed ? stage.querySelector('.cover-face') : nextBtn)?.focus();
+    }
+    focusBefore = null;
   }
 
   function renderFace(leaf, side) {
     const face = paging.faceFor(leaf, side);
     if (face.type === 'cover') return createCoverFace();
     if (face.type === 'inside') return createInsideCover();
-    if (face.type === 'page') return createPage(binder.pages[face.number - 1], face.number, binder);
+    if (face.type === 'page') return createPage(pages[face.number - 1], face.number, binder);
     return createBlankPage();
   }
 
@@ -81,7 +93,6 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
     cover.querySelector('.cover-face__title').textContent = binder.name;
     cover.querySelector('.cover-face__count').textContent = plural(countCards(binder), 'card');
     cover.addEventListener('click', () => flip.next());
-    coverBtn = cover;
     return cover;
   }
 
@@ -89,7 +100,7 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
   function buildBook() {
     flip?.destroy();
     const single = phoneQuery.matches;
-    paging = createPaging(single, binder.pages.length);
+    paging = createPaging(single, pages.length);
 
     flip = new PageFlip(stage, {
       single,
@@ -101,8 +112,10 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
       renderFace,
       onChange: (current) => {
         focusPage = paging.pagesShown(current)[0] ?? 0;
+        if (view.contains(document.activeElement)) focusBefore = document.activeElement;
         updateNav();
       },
+      onSettle,
     });
     updateNav();
   }
@@ -111,6 +124,7 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
   nextBtn.addEventListener('click', () => flip.next());
   // Close the binder: skip straight to page 1, then turn the cover back over it
   backBtn.addEventListener('click', () => {
+    if (flip.isDragging) return;
     if (flip.current > 1) flip.jumpTo(1);
     flip.prev();
   });
@@ -137,6 +151,10 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
       view.remove();
     },
   };
+}
+
+function emptyPage(layout) {
+  return { id: 'empty', slots: Array(layout === '3x3' ? 9 : 4).fill(null) };
 }
 
 // The inside of the front cover (seen on the left once the binder is open)

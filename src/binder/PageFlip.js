@@ -18,13 +18,14 @@ const CLICK_AFTER_DRAG_MS = 500; // the click a browser fires after a drag arriv
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 export class PageFlip {
-  constructor(container, { leafCount, maxCurrent = leafCount, renderFace, single = false, cover = false, start = 0, coverColor, onChange }) {
+  constructor(container, { leafCount, maxCurrent = leafCount, renderFace, single = false, cover = false, start = 0, coverColor, onChange, onSettle }) {
     this.leafCount = leafCount;
     this.maxCurrent = maxCurrent;
     this.renderFace = renderFace; // (leafIndex, 'front' | 'back') => Element
     this.single = single;
     this.cover = cover;
-    this.onChange = onChange;
+    this.onChange = onChange; // the position changed (a turn has started)
+    this.onSettle = onSettle; // every leaf is at rest again
     this.current = clamp(start, 0, maxCurrent);
     this.running = null; // the flip animation in progress, if any
 
@@ -85,11 +86,16 @@ export class PageFlip {
 
   // Jump straight to a position without animating (e.g. before closing the cover)
   jumpTo(current) {
+    if (this.isDragging) return;
     this.finishRunning();
     this.current = clamp(current, 0, this.maxCurrent);
     this.onChange?.(this.current);
     this.update();
   }
+
+  get isDragging() { return Boolean(this.gesture?.dir); }
+
+  isCoverLeaf(leaf) { return this.cover && leaf === this.leaves[0]; }
 
   get canNext() { return this.current < this.maxCurrent; }
   get canPrev() { return this.current > 0; }
@@ -98,7 +104,7 @@ export class PageFlip {
   prev() { if (this.canPrev) this.flip(this.current - 1, -1); }
 
   flip(leafIndex, direction) {
-    if (this.gesture?.dir) return; // a finger is already turning a page
+    if (this.isDragging) return; // a finger is already turning a page
 
     // Pressing quickly: finish the previous flip at once, then start the new one
     this.finishRunning();
@@ -119,8 +125,8 @@ export class PageFlip {
   // Move to the next/previous position and build the pages that will be uncovered
   commit(direction) {
     this.current += direction;
-    this.onChange?.(this.current);
     this.fillFaces();
+    this.onChange?.(this.current);
   }
 
   // Lift one leaf above the others so it can turn
@@ -219,7 +225,10 @@ export class PageFlip {
   // 0 = flat on the right, 1 = flat on the left. Dragging one page width turns the page fully on
   // a phone; on a computer the finger has further to travel (right page → left page).
   dragProgress(g) {
-    const distance = this.single ? g.pageWidth : g.pageWidth * 1.5;
+    let distance = this.single ? g.pageWidth : g.pageWidth * 1.5;
+    // On a computer the book slides by half a page while the cover turns; take that off the
+    // distance so the cover stays under the finger
+    if (!this.single && this.isCoverLeaf(g.leaf)) distance -= g.pageWidth / 2;
     const turned = clamp((-g.dir * g.dx) / distance, 0, 1);
     return g.dir > 0 ? turned : 1 - turned;
   }
@@ -306,7 +315,7 @@ export class PageFlip {
 
     // Shadow on the page being uncovered (right side early, left side late)
     const lift = Math.sin(Math.PI * progress);
-    const isCover = this.cover && leaf === this.leaves[0];
+    const isCover = this.isCoverLeaf(leaf);
     this.shadowRight.style.opacity = lift * (1 - progress);
     // Nothing lies on the left while the cover opens, so no shadow there
     this.shadowLeft.style.opacity = this.single || isCover ? 0 : lift * progress;
@@ -320,9 +329,10 @@ export class PageFlip {
     this.el.style.setProperty('--closed', amount);
   }
 
-  // Leaves current-2 … current+1 can be seen during a flip in either direction
+  // Leaves current-2 … current+1 can be seen during a flip in either direction.
+  // The cover is always kept: on a computer it's the board under every left-hand page.
   isNear(i) {
-    return i >= this.current - 2 && i <= this.current + 1;
+    return (i >= this.current - 2 && i <= this.current + 1) || (this.cover && i === 0);
   }
 
   // Put every leaf in its resting place, stacked in the right order
@@ -349,6 +359,7 @@ export class PageFlip {
     });
     this.shadowLeft.style.opacity = this.shadowRight.style.opacity = 0;
     this.setClosed(this.cover && this.current === 0 ? 1 : 0);
+    this.onSettle?.(this.current);
   }
 
   // Only build page content near the current position, so big binders stay fast
