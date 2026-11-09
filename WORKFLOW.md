@@ -1,6 +1,6 @@
 # 🛠️ Build Workflow
 
-How we build the Photocard Binder step by step. [README.md](README.md) says **what** we're building. This file says **how** we build it, one milestone at a time.
+How we build **Pocket Album World** step by step. [README.md](README.md) says **what** we're building. This file says **how** we build it, one milestone at a time.
 
 ---
 
@@ -37,7 +37,7 @@ A milestone is finished only when **all** of these are true:
 - [ ] Animations feel smooth, with no jitter (aim for 60 fps).
 - [ ] It works with **Reduce Motion** turned on (simple fade instead of 3D).
 - [ ] No errors in the browser console.
-- [ ] No celebrity photos committed to the repo. Use only placeholder art.
+- [ ] No real people's photos or copyrighted images committed to the repo. Use only placeholder art.
 - [ ] The README checklist is updated.
 
 ---
@@ -79,61 +79,57 @@ A milestone is finished only when **all** of these are true:
 ### M3: Drag to flip
 1. Pointer Events: drag distance → `progress` (0 → 1) → rotation angle.
 2. When you let go: if `progress > 0.5` **or** the swipe is fast, finish the flip; otherwise spring back.
-3. Stop the page from scrolling during the drag (`touch-action: none`).
+3. Sideways drags turn pages; up/down scrolling and pinch-zoom still work (`touch-action: pan-y pinch-zoom`).
 4. ✅ **Check:** on the iPhone, dragging feels like a real page.
 
-### M4: Add your cards
-1. "Add card" button → photo picker (`<input type="file" accept="image/*" multiple>`).
+### M4: Card Maker
+1. "New card" button → photo picker (`<input type="file" accept="image/*" multiple>`).
 2. Crop screen locked to the 55:85 ratio (drag and pinch to frame the photo).
-3. Make smaller copies (about 600 px tall), then save them to **IndexedDB** (`storage/db.js`).
-4. Place new cards in the next empty pocket. Drag cards to rearrange them. Long-press a card to remove it.
-5. ✅ **Check:** add 20 cards, reload the page, and they're all still there.
+3. Card back designer: color, pattern, short text (or a second photo).
+4. Make smaller copies (about 600 px tall) and save cards to **IndexedDB** (`src/storage/db.js`).
+5. A "My cards" list to view, edit and delete cards.
+6. ✅ **Check:** make 6 cards, reload the page, and they're all still there.
 
-### M5: Polish
-1. Sleeve shine layer on each pocket.
-2. Tap a card → it lifts out → you can spin it in 3D and see the back.
-3. Page-flip sound + vibration (where supported).
-4. ✅ **Check:** Diana's "wow" test 😄
+### M5: Album Studio v1
+1. New album: title, cover photo, colors, font.
+2. Sticker layer on the cover: drag on, resize, rotate, delete.
+3. Templates: **envelope** and **CD case** first (gift box and blind box come in Phase 2).
+4. Choose the album's 6 cards, plus an optional hidden card.
+5. 3D preview of the finished package (spin it around).
+6. Save as an `Album` + `CoverDesign` (editable later, not a flat image).
+7. ✅ **Check:** design an album, reload the page, and edit it again.
 
-### M5b: 3D photos (one level at a time)
-1. **Level 1:** tilt + glare. Mouse on computers, gyroscope on phones (with an "Enable motion" button for iOS).
-2. **Level 2:** holo foil layer for cards whose finish is `"holo"`.
-3. **Level 3:** pop-out layers. Cut out the person with background removal on the device, save the cut-out, and show the layers at different depths.
-4. **Level 4:** depth map. Run a depth model on the device, then a WebGL shader moves each pixel based on depth and tilt.
-5. Only the card you're focused on is animated in 3D.
-6. ✅ **Check:** tilting the phone clearly changes the photo, and the app stays smooth.
+### M6: Virtual Unboxing v1
+1. Unboxing scene: the package sits in front of you.
+2. **Peel the shrink-wrap** by dragging from a corner.
+3. **Open** the envelope flap or CD case lid (CSS 3D hinge).
+4. **Flip through the photobook** (reuses `PageFlip.js`), with the hidden card tucked between pages.
+5. **Random drop:** pick 2 cards from the album (weights by rarity), cards slide out face-down, tap or drag to flip and reveal.
+6. Sound effects + vibration where supported; Reduce Motion gets simple fades.
+7. ✅ **Check:** opening an album feels like a ritual, not a button.
 
-### M6: Page turn v2 (Three.js curl)
-1. Three.js scene with a bendable page mesh (about 40 segments across).
-2. Bend the page around a cylinder that follows the drag.
-3. Draw the cards onto the page, plus the plastic sleeve material and soft shadows.
-4. Keep the CSS version as a backup for older phones.
-5. ✅ **Check:** the page visibly curls while you drag it.
+### M7: Collection loop
+1. Unboxed cards become `CardInstance`s and go into the binder's next empty pockets.
+2. Drag cards between pockets; long-press to remove.
+3. Set page for each album: collected cards in color, missing ones as silhouettes, duplicates counter.
+4. "Open another" button to unbox again.
+5. ✅ **Check:** the whole loop works end to end: 6 photos → album → unbox 2 cards → binder → see what's missing.
 
-### M7: iOS app
-1. Xcode project: SwiftUI app + **Share Extension** target.
-2. Rebuild the binder view in SwiftUI using the web version as the design guide.
-3. `PhotosPicker` for adding cards, SwiftData for saving them.
-4. Share Extension: "Add to Binder" in Photos → the cards appear in the app.
-5. 3D photos: Vision cut-outs + depth data from Portrait mode photos.
-6. ✅ **Check:** running on Diana's iPhone through Xcode.
+### M8: Card effects
+1. Tap a card → it lifts out of the pocket → flip it to see the back.
+2. **Tilt + glare:** mouse on computers, gyroscope on phones (with an "Enable motion" button for iOS).
+3. **Holo foil** for holo cards.
+4. Only the card in focus is animated; Reduce Motion shows a still image.
+5. ✅ **Check:** tilting the phone clearly changes the card, and the app stays smooth.
 
-### M8: Extras
-Multiple binders · tags · search and filter · share a page as an image or video · iCloud sync. **Each one is its own small branch.**
+### M9: Playtest
+1. Write a short playtest script: what to try, and 5 questions (Was unboxing fun? Would you open another? What was confusing?).
+2. 3–5 friends play the loop on their phones; note what they say and where they get stuck.
+3. Turn the feedback into small fixes and decide what Phase 2 focuses on.
+4. ✅ **Check:** we know whether unboxing is fun, and what to change.
 
-### M9: DIY cover
-1. Cover editor: material, color, and front window.
-2. Sticker layer: drag on, resize, rotate, delete.
-3. Text tool with fonts.
-4. Save as a `CoverDesign` (editable later, not a flat image).
-5. ✅ **Check:** design a cover, reload the page, and edit it again.
-
-### M10: Page music
-1. Pick a song for a page or the whole binder: preview search, or an audio file from the phone.
-2. Player with fade-in and fade-out between pages, and a start time (jump to the chorus).
-3. A tap to turn music on, plus a mute button.
-4. Later: Apple Music or Spotify playback.
-5. ✅ **Check:** turning a page smoothly switches the song.
+### Phase 2–4
+Each phase is split into milestones (M10, M11, …) when we get there, following the README's Phase 2–4 table. **Each one is its own branch.**
 
 ---
 
@@ -157,6 +153,7 @@ Just say one of these:
 - Follow [README.md](README.md) for **what** to build and this file for **how**.
 - Keep `main` working. Do all work on a milestone branch.
 - Small commits, one task each. Never push or merge without Diana's OK.
-- Never add real celebrity photos or copyrighted music to the repo.
+- Never add real people's photos, copyrighted images or copyrighted music to the repo.
 - Plain JavaScript first, and no new libraries unless the README lists them or Diana agrees.
 - After each task, explain briefly what changed and how to see it.
+- Everything that goes to GitHub (code, comments, commits, docs) is written in **English**.
