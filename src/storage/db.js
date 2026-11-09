@@ -9,6 +9,7 @@
 const DB_NAME = 'pocket-fandom';
 const DB_VERSION = 2;
 const OPEN_TIMEOUT_MS = 10000;
+const WRITE_TIMEOUT_MS = 10000; // a save that hasn't finished by then is reported as failed
 export const STORES = ['cards', 'binders', 'merch'];
 
 let dbPromise = null;
@@ -23,7 +24,15 @@ export function savingIsAvailable() {
   return memory === null;
 }
 
+// ?memory in the link: keep everything in memory (used by the automated tests, so they
+// never touch saved cards and don't depend on the browser's database)
+const memoryOnlyLink = new URLSearchParams(location.search).has('memory');
+
 function openDb() {
+  if (memoryOnlyLink && !memory) {
+    memory = Object.fromEntries(STORES.map((name) => [name, new Map()]));
+    dbPromise = Promise.resolve(null);
+  }
   dbPromise ??= Promise.race([
     openIndexedDb(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), OPEN_TIMEOUT_MS)),
@@ -99,7 +108,7 @@ export async function writeMany(changes) {
     return;
   }
   const names = [...new Set(changes.map((c) => c.store))];
-  return new Promise((resolve, reject) => {
+  return withTimeout(new Promise((resolve, reject) => {
     const tx = db.transaction(names, 'readwrite');
     for (const { store, value, deleteId } of changes) {
       if (deleteId !== undefined) tx.objectStore(store).delete(deleteId);
@@ -108,7 +117,15 @@ export async function writeMany(changes) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error ?? new Error('Saving was cancelled (is the device out of space?)'));
-  });
+  }));
+}
+
+// Give up on a save that never finishes, so the app shows an error instead of waiting forever
+function withTimeout(promise) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Saving took too long. Please try again.')), WRITE_TIMEOUT_MS)),
+  ]);
 }
 
 // Ask the browser not to clear our data when space is low (works best when the
