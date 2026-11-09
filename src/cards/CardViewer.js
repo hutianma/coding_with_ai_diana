@@ -113,7 +113,9 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     if (!drag || event.pointerId !== drag.id) return;
     const dx = event.clientX - drag.x0;
     const dy = event.clientY - drag.y0;
-    if (Math.hypot(dx, dy) > 6) drag.moved = true;
+    // Shaking counts movement in any direction; turning over only counts sideways
+    if (dragShakes ? Math.hypot(dx, dy) > 6 : Math.abs(dx) > 6) drag.moved = true;
+    if (closing) return;
     if (drag.moved && dragShakes) {
       // Shake it: the item follows the finger (with a bit of stretch) and the fill sloshes
       const next = { x: rubber(dx), y: rubber(dy) };
@@ -143,16 +145,16 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     setFlipped(Math.round((flipAngle + dragAngle) / 180) * 180);
   };
 
-  // A shaken item springs back to the middle (and the fill sloshes once more)
+  // A shaken item springs back to the middle (and the fill sloshes once more).
+  // (Shaking only exists without Reduce Motion: the fill isn't live otherwise.)
   function springBack(offset) {
-    onShake?.(-offset.x, -offset.y);
     lift.style.transform = '';
-    if (!reducedMotion.matches) {
-      lift.animate([{ transform: `translate(${offset.x}px, ${offset.y}px)` }, { transform: 'none' }], {
-        duration: 260,
-        easing: 'cubic-bezier(.3, 1.4, .5, 1)',
-      });
-    }
+    if (closing) return;
+    onShake?.(-offset.x, -offset.y);
+    lift.animate([{ transform: `translate(${offset.x}px, ${offset.y}px)` }, { transform: 'none' }], {
+      duration: 260,
+      easing: 'cubic-bezier(.3, 1.4, .5, 1)',
+    });
   }
   cardEl.addEventListener('pointerup', endDrag);
   cardEl.addEventListener('pointercancel', (event) => {
@@ -189,6 +191,11 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
   function onOrientation(event) {
     if (event.beta == null || event.gamma == null) return;
     baseOrientation ??= { beta: event.beta, gamma: event.gamma };
+    // No motion sensor readings (some browsers): estimate "down" from the tilt angles
+    if (!motionGravity) {
+      const rad = Math.PI / 180;
+      sendGravity(clamp(Math.sin(event.gamma * rad)), clamp(Math.sin(event.beta * rad)));
+    }
     target = {
       x: clamp((event.gamma - baseOrientation.gamma) / 25),
       y: clamp((event.beta - baseOrientation.beta) / 25),
@@ -199,20 +206,31 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
   // Gravity and shaking come from the motion sensor: it knows which way is really down
   // (also upside down), and how hard the phone moves in any direction
   let gravity = null; // smoothed, so a shake doesn't look like a change of "down"
+  let motionGravity = false; // the motion sensor is giving gravity readings
+  let sentGravity = null;
+  // Only pass on real changes: sensor jitter would otherwise keep the fill animating
+  // (and the battery draining) while the phone is held still
+  function sendGravity(x, y) {
+    if (!onGravity) return;
+    if (sentGravity && Math.abs(x - sentGravity.x) + Math.abs(y - sentGravity.y) < 0.04) return;
+    sentGravity = { x, y };
+    onGravity(x, y);
+  }
   function onMotion(event) {
     const g = screenGravity(event.accelerationIncludingGravity);
-    if (g && onGravity) {
+    if (g) {
+      motionGravity = true;
       gravity = gravity ? { x: gravity.x * 0.8 + g.x * 0.2, y: gravity.y * 0.8 + g.y * 0.2 } : g;
-      onGravity(gravity.x, gravity.y);
+      sendGravity(gravity.x, gravity.y);
     }
     const a = screenAcceleration(event.acceleration);
     // Ignore the tiny jitter of a hand holding still. Metres per second² → a few px of push.
     if (a && onShake && Math.hypot(a.x, a.y) > 1.2) onShake(a.x * 1.6, a.y * 1.6);
   }
 
-  function listenToTilt() {
-    addEventListener('deviceorientation', onOrientation);
-    if (onGravity || onShake) addEventListener('devicemotion', onMotion);
+  function listenToTilt({ orientation = true, motion = true } = {}) {
+    if (orientation) addEventListener('deviceorientation', onOrientation);
+    if (motion && (onGravity || onShake)) addEventListener('devicemotion', onMotion);
   }
 
   // iPhone: tilt needs a one-time "Allow" from a button tap. Computers (mouse) never ask.
@@ -223,18 +241,19 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     if (needsPermission && !motionAllowed) {
       motionBtn.hidden = false;
       motionBtn.addEventListener('click', async () => {
-        try {
-          // Ask for both: the tilt angles (shine) and the motion sensor (gravity, shaking)
-          const answers = await Promise.all([
-            DeviceOrientationEvent.requestPermission(),
-            typeof DeviceMotionEvent?.requestPermission === 'function' ? DeviceMotionEvent.requestPermission() : 'granted',
-          ]);
-          motionAllowed = answers.every((a) => a === 'granted');
-        } catch {
-          motionAllowed = false;
-        }
+        // Ask for both, separately: the tilt angles (shine) and the motion sensor
+        // (gravity, shaking). Either one still works if the other is refused.
+        const ask = async (Api) => {
+          if (typeof Api === 'undefined' || typeof Api.requestPermission !== 'function') return true;
+          try { return (await Api.requestPermission()) === 'granted'; } catch { return false; }
+        };
+        const [orientation, motion] = await Promise.all([
+          ask(globalThis.DeviceOrientationEvent),
+          onGravity || onShake ? ask(globalThis.DeviceMotionEvent) : false,
+        ]);
+        motionAllowed = orientation || motion;
         motionBtn.hidden = true;
-        if (motionAllowed) listenToTilt();
+        listenToTilt({ orientation, motion });
       });
     } else {
       listenToTilt();
@@ -278,6 +297,8 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
   function close() {
     if (!dialog.open || closing) return;
     closing = true;
+    drag = null;
+    lift.style.transform = ''; // put back from the middle, even mid-shake
     cancelAnimationFrame(frame);
     onClose?.();
     removeEventListener('deviceorientation', onOrientation);

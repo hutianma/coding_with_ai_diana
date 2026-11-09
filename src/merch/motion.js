@@ -5,9 +5,9 @@
 
 const G = 9.81;
 
-// iPhones and iPads report accelerationIncludingGravity with the opposite sign to
-// other browsers (they report gravity itself; the standard reports the push that
-// holds the phone up). iPadOS says it's a Mac, so check for touch too.
+// iPhones and iPads report devicemotion with the opposite sign to other browsers, for
+// both accelerationIncludingGravity and acceleration (they pass on the sensor's own
+// convention). iPadOS says it's a Mac, so check for touch too.
 export function isAppleTouchDevice() {
   const ua = navigator.userAgent;
   return /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
@@ -41,9 +41,10 @@ export function screenGravity(aig, { apple = isAppleTouchDevice(), angle = scree
 
 // acceleration (without gravity, m/s²) → how the phone is moving on the screen.
 // The pieces inside lag behind, so they get pushed the opposite way.
-export function screenAcceleration(acc, { angle = screenAngle() } = {}) {
+export function screenAcceleration(acc, { apple = isAppleTouchDevice(), angle = screenAngle() } = {}) {
   if (acc?.x == null || acc?.y == null) return null;
-  return toScreen(acc.x, acc.y, angle);
+  const sign = apple ? -1 : 1;
+  return toScreen(sign * acc.x, sign * acc.y, angle);
 }
 
 function clamp(v) {

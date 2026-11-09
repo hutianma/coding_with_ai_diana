@@ -87,8 +87,10 @@ try {
   check('other phones (opposite sign) upright: down is down', gEq(screenGravity({ x: 0, y: 9.81 }, { apple: false, angle: 0 }), 0, 1));
   check('landscape: the phone\'s side is the screen\'s bottom', gEq(screenGravity({ x: 9.81, y: 0 }, { apple: true, angle: 90 }), 0, 1));
   check('lying flat: no down on the screen', gEq(screenGravity({ x: 0, y: 0, z: -9.81 }, { apple: true, angle: 0 }), 0, 0));
-  const acc = screenAcceleration({ x: 0, y: 5 }, { angle: 0 });
+  const acc = screenAcceleration({ x: 0, y: 5 }, { apple: false, angle: 0 });
   check('shaking the phone upwards is "up" on the screen', near(acc.x, 0) && near(acc.y, -5));
+  const accApple = screenAcceleration({ x: 0, y: -5 }, { apple: true, angle: 0 });
+  check('iPhone (opposite sign): shaking upwards is "up" too', near(accApple.x, 0) && near(accApple.y, -5));
 
   // A push moves the pieces the other way (they lag behind the badge)
   const alphaOf = (cv, y0, y1) => { const d = cv.getContext('2d').getImageData(0, y0, 600, y1 - y0).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n; };
