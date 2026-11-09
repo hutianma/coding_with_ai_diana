@@ -13,6 +13,7 @@
 <script type="module">
 import { createShaker } from '/src/merch/shaker.js';
 import { polaroidSizes, LAYOUTS } from '/src/merch/Polaroid.js';
+import { screenGravity, screenAcceleration } from '/src/merch/motion.js';
 
 const out = document.getElementById('out');
 const results = [];
@@ -77,6 +78,42 @@ try {
   createShaker(b, { fill: 'stars', seed: 9 }).settle(170);
   check('the same badge always looks the same when settled', a.toDataURL() === b.toDataURL());
 
+  // ---------- Phone sensors → screen directions ----------
+  const near = (v, w) => Math.abs(v - w) < 0.02;
+  const gEq = (g, x, y) => g && near(g.x, x) && near(g.y, y);
+  check('iPhone upright: down is down', gEq(screenGravity({ x: 0, y: -9.81 }, { apple: true, angle: 0 }), 0, 1));
+  check('iPhone upside down: down is up the screen', gEq(screenGravity({ x: 0, y: 9.81 }, { apple: true, angle: 0 }), 0, -1));
+  check('iPhone tipped onto its right side: down is right', gEq(screenGravity({ x: 9.81, y: 0 }, { apple: true, angle: 0 }), 1, 0));
+  check('other phones (opposite sign) upright: down is down', gEq(screenGravity({ x: 0, y: 9.81 }, { apple: false, angle: 0 }), 0, 1));
+  check('landscape: the phone\'s side is the screen\'s bottom', gEq(screenGravity({ x: 9.81, y: 0 }, { apple: true, angle: 90 }), 0, 1));
+  check('lying flat: no down on the screen', gEq(screenGravity({ x: 0, y: 0, z: -9.81 }, { apple: true, angle: 0 }), 0, 0));
+  const acc = screenAcceleration({ x: 0, y: 5 }, { angle: 0 });
+  check('shaking the phone upwards is "up" on the screen', near(acc.x, 0) && near(acc.y, -5));
+
+  // A push moves the pieces the other way (they lag behind the badge)
+  const alphaOf = (cv, y0, y1) => { const d = cv.getContext('2d').getImageData(0, y0, 600, y1 - y0).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n; };
+  const pc = document.createElement('canvas'); pc.width = pc.height = 600;
+  const pushed = createShaker(pc, { fill: 'glitter', seed: 2 });
+  pushed.settle(900); // everything at the bottom
+  // The average height of everything drawn (0 = top, 600 = bottom)
+  const middleOf = (cv) => {
+    const d = cv.getContext('2d').getImageData(0, 0, 600, 600).data; let sum = 0, n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) { sum += Math.floor((i >> 2) / 600); n++; }
+    return n ? sum / n : 0;
+  };
+  const middleBefore = middleOf(pc);
+  pushed.push(0, 120); // the badge jerks down → the pieces fly up
+  pushed.stop();
+  pushed.advance(12);
+  const middleAfter = middleOf(pc);
+  check('jerking the badge down throws the pieces up', middleBefore - middleAfter > 80, `middle ${middleBefore.toFixed(0)} → ${middleAfter.toFixed(0)}`);
+
+  // Gravity pointing up (phone upside down): pieces collect at the top
+  pushed.setGravity(0, -1);
+  pushed.stop();
+  pushed.advance(900);
+  check('upside down, the pieces fall to the top', alphaOf(pc, 0, 270) > alphaOf(pc, 330, 600) * 5);
+
   // ---------- The ＋ New menu ----------
   await new Promise((res) => { const q = indexedDB.deleteDatabase('pocket-fandom'); q.onsuccess = q.onerror = q.onblocked = res; setTimeout(res, 1500); });
   await new Promise((r) => { f.onload = r; f.src = '/index.html?open'; });
@@ -108,11 +145,38 @@ try {
   await until(() => badgePhoto.complete && badgePhoto.naturalWidth);
   check('badge photo is saved square (600×600) and red', badgePhoto.naturalWidth === 600 && badgePhoto.naturalHeight === 600 && await colorAt(badgePhoto, 0.5, 0.5) === 'red');
 
+  // Animations run on a timer this test controls (headless browsers may never run them)
+  let tick = 0;
+  win.requestAnimationFrame = (cb) => setTimeout(() => cb((tick += 16)), 4);
   doc.querySelector('.my-cards__item .my-cards__thumb').click();
   await until(() => doc.querySelector('dialog.viewer[open]'));
   const viewer = doc.querySelector('dialog.viewer[open]');
   const shakeBtn = [...viewer.querySelectorAll('.viewer__btn')].find((x) => x.textContent.includes('Shake'));
   check('picking up a 流麻 badge: round viewer with Shake', viewer.classList.contains('viewer--shape-badge') && !!shakeBtn);
+
+  // Dragging the badge shakes it (it doesn't turn over); a tap still turns it over
+  const vcard = viewer.querySelector('.viewer__card');
+  const vlift = viewer.querySelector('.viewer__lift');
+  const vr = vcard.getBoundingClientRect();
+  const vp = (type, x, y) => vcard.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 21, isPrimary: true, clientX: vr.left + vr.width / 2 + x, clientY: vr.top + vr.height / 2 + y }));
+  vp('pointerdown', 0, 0); vp('pointermove', 0, 40); vp('pointermove', 0, -40);
+  const moved = /translate/.test(vlift.style.transform);
+  vp('pointermove', 0, 30); vp('pointerup', 0, 30);
+  check('dragging the badge moves it up and down (a shake), without turning it over',
+    moved && vcard.getAttribute('aria-pressed') === 'false' && vlift.style.transform === '', vlift.style.transform);
+  vp('pointerdown', 0, 0); vp('pointerup', 0, 0);
+  check('a tap still turns the badge over', vcard.getAttribute('aria-pressed') === 'true');
+  vp('pointerdown', 0, 0); vp('pointerup', 0, 0);
+
+  // The phone held upside down: the pieces fall to the top of the badge
+  const fillCanvas = viewer.querySelector('.badge__fill');
+  for (let i = 0; i < 30; i++) {
+    win.dispatchEvent(new win.DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: 0, y: -9.81, z: 0 }, acceleration: { x: 0, y: 0, z: 0 } }));
+    await wait(20);
+  }
+  await wait(3000);
+  const cnt = (y0, y1) => { const d = fillCanvas.getContext('2d').getImageData(0, y0, 600, y1 - y0).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n; };
+  check('phone upside down → the pieces fall to the top', cnt(0, 270) > cnt(330, 600) * 2, `${cnt(0, 270)} vs ${cnt(330, 600)}`);
   viewer.querySelector('.viewer__close').click();
   await until(() => !doc.querySelector('dialog.viewer[open]'), 3000);
 
