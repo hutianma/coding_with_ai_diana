@@ -1,285 +1,267 @@
-# 📒 Photocard Binder
+# 📮 Pocket Album World
 
-A digital photocard binder for showing off your celebrity and idol photocard collection. You flip through pages with a realistic 3D page-turn, just like a real binder with plastic sleeves.
+**A cozy, creative, social collecting game.**
+*Create it. Unbox it. Collect it. Trade it.*
 
-> **Status:** planning stage. This README is the project plan.
-
----
-
-## 1. The idea
-
-Collectors keep photocards in binders with clear pocket sleeves, and part of the fun is flipping through the pages. This project recreates that online:
-
-- Cards sit in **pocket sleeves** (2×2 or 3×3 per page) with a glossy plastic shine.
-- You **drag or swipe** to turn a page. The page bends, casts a shadow, and lands on the other side.
-- You can **tap a card** to lift it out of its sleeve, spin it in 3D, and see the back.
-- Cards come from **your own photo library**, so you can add a card straight from the Photos app.
+> **Status:** Phase 1 (single-player prototype) in progress.
+> The binder with 3D page turning is already live: <https://hutianma.github.io/coding_with_ai_diana/>
 
 ---
 
-## 2. Platform decision
+## 1. Overview
 
-| Option | What's possible | Verdict |
-|---|---|---|
-| **Plugin inside Apple Photos** | Apple only allows *Photo Editing Extensions*, which edit a single photo. You can't add a custom viewer or binder inside Photos. | ❌ Not possible |
-| **Share Extension** ("Add to Binder" in the Photos share sheet) | You select photos in Photos, tap Share, then tap **Add to Binder**, and the photos are sent to our app. | ✅ This is how we "plug into" Photos |
-| **Web app (PWA)** | Runs in Safari on iPhone, iPad and computers, and can be added to the home screen. Can pick photos from your library. | ✅ **Start here**: fastest to build and share |
-| **Native iOS app (SwiftUI)** | Best performance, works offline, includes the Share Extension, and can go on the App Store. | ✅ **Phase 2** |
+Pocket Album World is a casual social game built around **user-generated content (UGC)**.
+Players turn their own photos, pets, illustrations or original characters into **virtual albums**.
+Other players **unbox** those albums, collect the **random photocards** inside, keep them in a binder, and **trade** cards with each other.
+Each album a player makes adds to a shared game world.
 
-**Plan:** build the **web prototype first** to perfect the page-turn animation and design. Then turn it into a **native iOS app with a Photos Share Extension**.
-
----
-
-## 3. Features
-
-### MVP (must have)
-- [x] Binder cover screen. Tap it to open.
-- [ ] Pages with 2×2 or 3×3 card pockets.
-- [ ] **3D page turn**: drag the page edge to flip it, or tap the arrows.
-- [ ] Add cards from your photo library and crop them to photocard ratio (**55 × 85 mm**, about 2:3.1).
-- [ ] Rearrange cards by dragging. Remove cards.
-- [ ] Collection saved on the device, so it's still there after you close the app.
-
-### Nice to have
-- [ ] Tap a card to lift it out, spin it in 3D, and see its front and back.
-- [ ] Holographic or glossy shine that moves when you tilt the phone (gyroscope).
-- [ ] Several binders, for example one per group or artist, with custom covers and colors.
-- [ ] Tags for each card: artist, group, album, era, and whether it's rare.
-- [ ] Search and filter ("show all cards from album X").
-- [ ] Page-flip sound and a small vibration.
-- [ ] Share a page as an image or short video for social media.
-- [ ] Optional account and cloud sync (iCloud / Sign in with Apple).
+**Positioning:** a lightweight social game where **players create the collectibles**. It is *not* a plain gacha simulator.
+What makes it different is the combination of **UGC + Virtual Unboxing + Social Trading**.
 
 ---
 
-## 4. Tech stack
+## 2. Core game loop
 
-### Phase 1: Web prototype
-| Part | Choice | Why |
-|---|---|---|
-| Language | HTML + CSS + JavaScript (ES modules) | Simple, no setup needed |
-| Build tool | **None**: files are served exactly as they are | Nothing to install; libraries like Three.js load from a CDN when needed |
-| 3D page turn (simple) | **CSS 3D transforms** (`perspective`, `rotateY`, `backface-visibility`) | Smooth, light, good for a first version |
-| 3D page turn (realistic bend) | **Three.js**: a page mesh whose vertices are bent along a curl | A real paper-curl look |
-| Gestures | Pointer Events (drag progress → rotation angle) | Works with mouse and touch |
-| Storage | **IndexedDB** (built into the browser) | Can store many images on the device |
-| Hosting | GitHub Pages / Vercel | Free, one link to share |
+```
+ Create an album → Unbox it → Collect photocards → Explore the mall → Trade with players → Complete sets
+        ↑                                                                                       │
+        └───────────────────────────── rewards unlock new decorations ─────────────────────────┘
+```
 
-### Phase 2: Native iOS
-| Part | Choice |
+---
+
+## 3. Five core features
+
+### 🎨 Album Studio: design an album
+- Upload photos and design the **cover, title, colors and fonts**.
+- Design the **front and back of each photocard**.
+- Add **packaging, stickers and hidden bonus items**.
+- Choose a template: **CD case, envelope, gift box or blind box**.
+
+### 📦 Virtual Unboxing: open albums with your hands
+- Use gestures to **tear off the shrink-wrap**, **open the packaging**, **flip through the photobook**, and **find hidden photocards**.
+- Sound, haptics, card flips and random drops make opening an album feel like a real unboxing ritual.
+
+### 📒 My Binder: digital collection book
+- Organize, drag and decorate binder pages, with **3D page turning** (already built).
+- Flip cards over to see the back. **Holographic and animated effects** for special cards.
+- **Set-completion rewards.**
+
+### 🏬 Trading Mall: a virtual shopping street
+- Walk through **other creators' shops** and browse their albums, display cases and collections.
+- Pick up new albums and look for the photocards you're missing.
+
+### 💌 Photocard Trading: swap cards with players
+- Browse **Wishlists** and send trade requests.
+- Both players drag their cards into a **virtual envelope**. Once both confirm, it's **sealed, stamped and mailed** with an animation.
+
+---
+
+## 4. Key game mechanics
+
+| Mechanic | What it means |
 |---|---|
-| App UI | SwiftUI |
-| 3D page turn | SceneKit or RealityKit (bent page mesh), or `UIPageViewController` with `.pageCurl` as a quick fallback |
-| Photo access | `PhotosPicker` (PhotosUI) |
-| Photos integration | **Share Extension** target → "Add to Binder" |
-| Storage | SwiftData + image files in the app's storage |
-| Sync (optional) | CloudKit |
-| Tilt shine | CoreMotion |
+| **Random drops** | Each unboxing can give a different combination of photocards. |
+| **Set collecting** | Finishing a series unlocks an animated cover, decorations or a hidden card. |
+| **Rarity** | Common → Holo → Animated Limited, and more. |
+| **Wishlist** | Mark the cards you want, which makes it easier to find trade partners. |
+| **Creator Shops** | Each player runs a custom shop for their own album series. |
+| **Weekly Themes** | Players create and show off work around a shared theme. |
+| **Customization** | Decorate your binder, shop and personal display space. |
 
 ---
 
-## 5. How the page turn works
+## 5. Visual & interaction direction
 
-### Version A: CSS 3D (start here)
-```
- ┌──────────── binder (perspective: 2000px) ────────────┐
- │  left page (static)  ║  right page (flippable)       │
- │                      ║  ┌ front face ┐               │
- │                      ║  └ back face  ┘ (rotateY 180) │
- └──────────────────────╨───────────────────────────────┘
-                       spine = transform-origin: left center
-```
-1. Each page is a `div` with a **front** and a **back** face (`backface-visibility: hidden`).
-2. `transform-origin` sits on the **spine** (the left edge).
-3. As you drag, `progress = dragDistance / pageWidth` (from 0 to 1), so `rotateY(-progress * 180deg)`.
-4. When you let go, the page finishes the flip if progress is over 0.5, and springs back if not (easing curve).
-5. For depth, a shadow gradient on the page underneath gets stronger as the page lifts. A highlight moves across the turning page.
-
-### Version B: Three.js paper curl (upgrade)
-1. Each page is a `PlaneGeometry` with many segments across its width (for example 40).
-2. Every frame, each vertex is bent around a **cylinder** whose position follows the drag. This makes the page curl instead of turning like a stiff board.
-3. The card textures (`CanvasTexture`) are drawn onto the page. A second slightly transparent layer with a reflective material acts as the plastic sleeve.
-4. Soft shadows come from a directional light with shadow maps.
-
-### Plastic sleeve and shine effect
-- Each pocket is a slightly transparent layer with a **diagonal white gradient** on top.
-- The gradient angle follows the pointer or the phone's tilt, which makes the plastic shine.
-- Holo cards get a rainbow layer (`mix-blend-mode: color-dodge`).
+| Area | Style |
+|---|---|
+| **Mall & shops** | *Cozy Pixel World*: pixel art or an isometric view |
+| **Album Studio & Binder** | *Scrapbook UI*: journal-like, with stickers and paper textures |
+| **Cards** | Polished 2D/3D card effects: flip, tilt, holo shine |
+| **Unboxing** | Dragging, tearing, page-turning, light physics and sound effects |
 
 ---
 
-## 5b. Making photos look 3D (the image changes with the viewing angle)
+## 6. Development phases
 
-Goal: when you **tilt your phone** or **move your mouse**, each photocard looks like a real object with depth. It isn't a flat picture.
+### Phase 1: Single-player prototype ← *we are here*
+Upload photos, design an album, unbox it virtually, get random photocards, and keep them in a digital binder.
+**The goal is to prove that unboxing is fun.**
 
-**What controls the angle**
-- 📱 Phone: gyroscope (`DeviceOrientationEvent`; iPhone Safari needs a one-time "Allow motion" button) / CoreMotion in the iOS app.
-- 💻 Computer: mouse position over the card.
-- The tilt is limited to about ±15° and smoothed, so it feels calm and doesn't jitter.
+**The first complete playable loop:**
+> Upload **6 photos** → design an **album** → unbox it and get **2 random photocards** → put them in the **binder** → see which cards you **haven't collected yet**.
 
-There are four levels of the effect, from easiest to most impressive:
+Expand to multiplayer trading only once this loop is fun.
 
-| Level | Effect | How it works | Difficulty |
+### Phase 2: Collection system
+Rarity, set achievements, a personal display space and rewards.
+
+### Phase 3: Multiplayer mall
+Accounts, publishing albums, the mall, Wishlists, and a trade flow where both players confirm.
+
+### Phase 4: Social world
+Custom shops, themed events, more player interaction and live content.
+
+---
+
+## 7. Roadmap
+
+Each milestone (M#) is one branch, built and reviewed as described in [WORKFLOW.md](WORKFLOW.md).
+
+### Phase 1: Single-player prototype
+
+| Milestone | Goal | Done when… | Status |
 |---|---|---|---|
-| **1. Tilt + glare** | The card leans toward you and a shiny streak slides across it | CSS `rotateX/rotateY` + a moving gradient layer | ⭐ Easy |
-| **2. Holo foil** | Rainbow shimmer that shifts with the angle, like holographic cards | Rainbow gradient + sparkle texture, `mix-blend-mode: color-dodge`, offset by the tilt | ⭐⭐ |
-| **3. Pop-out layers** | The person floats **in front of** the background, and the two move at different speeds | Cut the subject out of the photo (on-device AI), then stack 2–3 layers at different depths (`translateZ`) | ⭐⭐⭐ |
-| **4. Depth map** | The whole photo has real depth, like *Spatial Scenes* in the iOS Photos app | Get a depth map (an image where brightness means distance). WebGL shifts each pixel based on its depth and the tilt angle | ⭐⭐⭐⭐ |
+| **M0: Setup** | App skeleton, auto-deploy to GitHub Pages | The page is live at a public link | ✅ Done |
+| **M1: Binder** | Cover, binder pages, 2×2 pockets, placeholder cards | Looks like a binder on phone and computer | ✅ Done |
+| **M2: Page turn** | 3D page flip with arrows and keyboard | Pages flip smoothly at 60 fps | ✅ Done |
+| **M3: Drag to flip** | The page follows your finger, snaps or springs back | Feels natural on iPhone | 🟡 Built, waiting to merge |
+| **M4: Card Maker** | Upload photos, crop to photocard shape (55:85), design the card back, save on the device | Make 6 cards, reload, and they're still there | ⬜ |
+| **M5: Album Studio v1** | Title, cover, colors, font, stickers, template (start with **envelope** + **CD case**), choose the 6 cards and an optional hidden card | Design an album and see it as a 3D package | ⬜ |
+| **M6: Virtual Unboxing v1** | Peel the shrink-wrap, open the package, flip through the photobook, 2 random cards drop out and flip over to reveal them; sound + vibration | Opening an album feels like a ritual, not a button | ⬜ |
+| **M7: Collection loop** | Unboxed cards go into the binder; a set page shows missing cards as silhouettes; duplicates counter | The whole first playable loop works end to end | ⬜ |
+| **M8: Card effects** | Tap to flip a card over, tilt + glare, holo shine | Cards feel like real objects | ⬜ |
+| **M9: Playtest** | 3–5 friends play the loop; tune based on what they say | We know whether unboxing is fun | ⬜ |
 
-**Where the cut-outs (Level 3) and depth maps (Level 4) come from**
-- **Web:** cut-outs from on-device background removal (e.g. `@imgly/background-removal`); depth from an AI depth model running in the browser (e.g. *Depth Anything* via `transformers.js`).
-- **iOS:** cut-outs from Apple's Vision framework (`VNGenerateForegroundInstanceMaskRequest`, the same as "lift subject" in Photos). Depth comes from **Portrait mode photos, which already store real depth data** (`AVDepthData`), or from an AI depth model for other photos.
-- Everything runs **on the device**, so photos are never uploaded.
-- Each result is calculated once when a card is added, then saved with the card, so later viewing stays fast.
+### Phase 2–4 (to be split into milestones later)
 
-**Bonus: lenticular cards.** Some real photocards change picture when you tilt them. You choose 2–3 photos, and the card blends between them depending on the angle.
-
-**Rules so it feels good**
-- The 3D effect runs only on the card you're looking at or holding, not on all 9 cards at once, so the app stays smooth.
-- Turned off during page turns, and replaced by a still image when *Reduce Motion* is on.
-
----
-
-## 5c. Future ideas (later, after the main plan)
-
-### 🎨 DIY binder cover
-Users design their own cover, like decorating a real binder:
-- Choose a cover color or material (leather, glitter, clear plastic, pastel).
-- Add a photo or a photocard to a **front window** on the cover.
-- **Stickers:** hearts, stars, the group's logo, or your own images. Drag them on, then resize and rotate them.
-- Text in fun fonts, such as the idol's name, the group's name, or a fan-club name.
-- Spine label and ribbon or charm decorations.
-- The cover is saved as a list of stickers and settings, not as a flat image, so it can be edited again later.
-
-### 🎵 Music for each page
-When you open a page, its own song plays, such as the song from that stage performance or the idol's signature song.
-- Each page (or the whole binder) can be given a **theme song**, with a start time (e.g. jump to the chorus).
-- Music **fades** from one song to the next as you turn the page.
-- Play/pause and mute buttons. Music never starts by surprise; the user taps once to turn music on (browsers require this anyway).
-
-**Where the music comes from (copyright-safe options).** The app must not include or upload songs. Instead:
-| Source | How |
+| Phase | Main pieces |
 |---|---|
-| **Apple Music** | MusicKit (web: MusicKit JS, iOS: MusicKit). Plays full songs for subscribers and 30-second previews for everyone else |
-| **Spotify / YouTube** | Official embedded players linked to a song or stage video |
-| **Song previews** | iTunes Search API: free 30-second previews, with no account needed |
-| **Your own files** | The user picks an audio file stored on their own device |
+| **2: Collection** | Rarity tiers, drop rates, set-completion rewards, personal display room, DIY binder covers, more album templates (gift box, blind box), Three.js paper-curl page turn |
+| **3: Multiplayer mall** | Accounts + backend, publishing albums, moderation, pixel/isometric mall, Wishlist, two-way trade flow with envelope animation, server-side drops |
+| **4: Social world** | Custom creator shops, weekly themes and events, more ways to interact, live content; maybe a native iOS app |
 
 ---
 
-## 6. Data model
+## 8. Core design challenges
+
+| Challenge | The question | Ideas |
+|---|---|---|
+| **Collecting motivation** | Why would players collect albums made by strangers? | Weekly themes, beautiful design tools, set-completion rewards, featured creators |
+| **Scarcity vs. fairness** | Unlimited unboxing makes trades worthless; too many limits ruin the cozy feeling. | Daily free packs, limited "print runs" per album, packs earned through play; to be tuned in playtests |
+| **Interaction depth** | Unboxing should be more than tapping a button. | Searching, hands-on actions, and a reveal: tear, open, flip, discover |
+| **Safety & governance** | Public images raise privacy, permission, copyright and moderation issues; trades need anti-cheat. | Upload rules, reporting, review before publishing, server-side random drops and trade checks |
+
+---
+
+## 9. How it works (tech)
+
+### Stack
+| Part | Phase 1 (now) | Later |
+|---|---|---|
+| App | Plain HTML + CSS + JavaScript (ES modules), **no build step** | Same; maybe a native iOS app in Phase 4 |
+| 3D cards & page turns | CSS 3D transforms | Three.js for paper curl and fancier effects |
+| Storage | **IndexedDB** on the device (photos never leave the phone) | A cloud database + image storage (e.g. Supabase or Firebase, to be decided in Phase 3) |
+| Random drops | On the device | **On the server**, so drops and trades can't be cheated |
+| Mall | — | Pixel/isometric scene with a 2D game library (e.g. PixiJS or Phaser) |
+| Hosting | GitHub Pages | Same for the app + the chosen backend |
+
+### Page turning (built in M2–M3)
+- A binder is a stack of **leaves** (sheets), each with a front and a back face, rotating around the spine with CSS `rotateY` (see `src/binder/PageFlip.js`).
+- Dragging maps finger distance to turn progress. On release, the page finishes the turn if it's past halfway or flicked; otherwise it springs back.
+- Only the pages near the current one are built, so big binders stay fast.
+- **Reduce Motion** replaces the 3D turn with a short fade.
+- The same engine will be reused to flip through the **photobook** during unboxing (M6).
+
+### Making cards look 3D
+| Level | Effect | How |
+|---|---|---|
+| 1. Tilt + glare | The card leans and a shine slides across it | CSS `rotateX/Y` + moving gradient, driven by the mouse or the phone's gyroscope |
+| 2. Holo foil | A rainbow shimmer that shifts with the angle | Rainbow gradient with `mix-blend-mode: color-dodge` |
+| 3. Pop-out layers | The subject floats in front of the background | On-device background removal → layers at different depths |
+| 4. Depth map | The whole photo has real depth | An AI depth map + a WebGL shader |
+
+Levels 1–2 are planned for M8, and 3–4 for Phase 2. Only the card in focus is animated, and Reduce Motion shows a still image.
+
+### Unboxing (planned for M6)
+- **Shrink-wrap:** drag from a corner; a clipping mask follows the finger, and the wrap peels away once it's past a threshold.
+- **Opening:** the lid or flap hinges open with CSS 3D (envelope flap, CD case lid).
+- **Photobook:** reuses the page-turn engine.
+- **Drop & reveal:** cards slide out face-down; tap or drag to flip each one. The rarer the card, the bigger the reveal (shine, particles, sound).
+- **Sound & haptics:** paper/plastic sounds; `navigator.vibrate` where supported (iPhone Safari doesn't support it, so the native app in Phase 4 would add real haptics).
+
+---
+
+## 10. Data model (Phase 1)
 
 ```ts
-Binder {
+CardDesign {            // a card as the creator designed it
   id: string
-  name: string            // "SEVENTEEN binder"
-  coverColor: string
-  cover?: CoverDesign     // DIY cover (future)
-  themeSong?: Song        // default music for the whole binder (future)
-  layout: "2x2" | "3x3"
-  pages: Page[]
+  albumId: string
+  front: Blob           // photo cropped to 55:85
+  back: CardBack        // color, pattern, text, or a second photo
+  rarity: "common" | "holo" | "animated"
+  hidden?: boolean      // the album's secret card
 }
 
-Page {
+CardInstance {          // one copy that a player owns (this is what gets traded)
   id: string
-  slots: (CardId | null)[]   // 4 or 9 slots
-  song?: Song                // overrides binder themeSong (future)
+  designId: string
+  obtainedAt: Date
+  source: "unbox" | "trade" | "reward"
+}
+
+Album {
+  id: string
+  title: string
+  template: "envelope" | "cd" | "giftbox" | "blindbox"
+  cover: CoverDesign    // photo, colors, font, stickers
+  cardIds: string[]     // the set, e.g. 6 cards
+  cardsPerPack: number  // e.g. 2
+  dropWeights?: Record<Rarity, number>
+}
+
+Binder {
+  id: string
+  layout: "2x2" | "3x3"
+  pages: { id: string, slots: (CardInstanceId | null)[] }[]
 }
 
 CoverDesign {
-  material: "leather" | "glitter" | "clear" | "pastel"
   color: string
-  windowCardId?: CardId
+  font: string
+  photo?: Blob
   stickers: { image: string, x: number, y: number, scale: number, rotation: number }[]
-  texts: { content: string, font: string, color: string, x: number, y: number }[]
-}
-
-Song {
-  title: string
-  artist: string
-  source: "appleMusic" | "spotify" | "youtube" | "preview" | "localFile"
-  ref: string             // song ID, URL, or local file key
-  startAt?: number        // seconds, e.g. jump to the chorus
-}
-
-Card {
-  id: string
-  frontImage: Blob        // cropped to 55:85
-  backImage?: Blob
-  artist?: string
-  group?: string
-  album?: string
-  tags: string[]
-  finish: "matte" | "glossy" | "holo"
-  effect: "none" | "tilt" | "popout" | "depth" | "lenticular"
-  subjectMask?: Blob      // cut-out of the person (Level 3)
-  depthMap?: Blob         // grayscale depth image (Level 4)
-  lenticularImages?: Blob[]
-  addedAt: Date
 }
 ```
 
+Phase 3 adds `Player`, `Shop`, `Wishlist` and `Trade { from, to, offered[], requested[], status }`, stored on the server.
+
 ---
 
-## 7. Planned project structure (Phase 1)
+## 11. Project structure
 
 ```
 coding_with_ai_diana/
-├── README.md
+├── README.md               # this plan
+├── WORKFLOW.md             # how each milestone is built
+├── CLAUDE.md               # rules for Claude Code
 ├── index.html
 ├── .github/workflows/
-│   └── deploy.yml           # publishes main to GitHub Pages
-├── public/
-│   └── sample-cards/        # placeholder art for demos (NOT real celebrity photos)
+│   └── deploy.yml          # publishes main to GitHub Pages
+├── tests/                  # automated browser tests (open in a browser)
 └── src/
-    ├── main.js              # app entry
-    ├── binder/
-    │   ├── Binder.js        # pages, current spread, navigation
-    │   ├── PageFlip.js      # drag → rotation, snapping, easing
-    │   └── Sleeve.js        # pocket + plastic glare
-    ├── cards/
-    │   ├── CardPicker.js    # pick a photo from the library
-    │   ├── Cropper.js       # crop to photocard ratio
-    │   └── CardViewer.js    # tap-to-inspect 3D card
-    ├── storage/
-    │   └── db.js            # IndexedDB save/load
+    ├── main.js             # app entry
+    ├── binder/             # My Binder: pages, page flip, pockets
+    ├── cards/              # card drawing (Card Maker in M4)
+    ├── data/               # sample data (placeholder art only)
     └── styles/
-        ├── base.css
-        ├── binder.css
-        └── sleeve.css
 ```
+Planned folders: `src/studio/` (Album Studio), `src/unboxing/` (Virtual Unboxing), `src/storage/` (IndexedDB).
 
 ---
 
-## 8. Roadmap
+## 12. Safety, privacy & content rules
 
-| Milestone | Goal | Done when… |
-|---|---|---|
-| **M0: Setup** | App skeleton, deploy to GitHub Pages | The empty page is live at a public link |
-| **M1: Static binder** | Cover plus a 2×2 page grid with placeholder cards | Looks like a binder on phone and computer |
-| **M2: Page turn v1** | CSS 3D flip with tap arrows | Pages flip smoothly at 60 fps |
-| **M3: Drag to flip** | Pointer and touch dragging with snapping | Feels natural on iPhone Safari |
-| **M4: Add your cards** | Photo picker + crop + save to IndexedDB | Cards are still there after a reload |
-| **M5: Polish** | Sleeve shine, shadows, sound, card inspect view | Friends say "wow" 😄 |
-| **M5b: 3D photos** | Tilt + glare → holo → pop-out layers → depth map | The photo changes when you tilt the phone |
-| **M6: Page turn v2** | Three.js curling paper | The page visibly bends while dragged |
-| **M7: iOS app** | SwiftUI app + Photos **Share Extension** | "Add to Binder" works from the Photos app |
-| **M8: Extras** | Multiple binders, tags, search, sharing, iCloud sync | — |
-| **M9: DIY cover** | Cover editor with materials, stickers, text, and a front window | You can design a cover and edit it again later |
-| **M10: Page music** | A theme song for each page, with fading between songs | Turning a page changes the song |
+- **Phase 1–2 are private:** photos stay on the player's own device and are never uploaded.
+- **Only upload what you have the right to use:** your own photos, pets, art and original characters. Photos of celebrities or other people's artwork can't be published.
+- **Before anything goes public (Phase 3):** upload rules, reporting, review/moderation, and a way to remove content.
+- **Fair trading:** random drops and trades are checked on the server, and both players must confirm.
+- The repo only contains placeholder art: no real people's photos and no copyrighted images.
 
 ---
 
-## 9. Things to keep in mind
-
-- **Copyright and privacy:** celebrity photos and official photocards belong to their owners. The app only shows photos **from your own library on your own device**. It does not ship or host any celebrity images. Demo assets use placeholder art.
-- **Performance:** make thumbnails smaller (for example 600 px tall) so big binders stay smooth. Only draw the pages next to the one you're on.
-- **Accessibility:** offer arrow buttons and keyboard navigation (← →) as well as dragging, and follow the *Reduce Motion* setting by using a simple fade instead of the flip.
-- **iPhone Safari quirks:** test 3D transforms and the photo picker on a real device early.
-
----
-
-## 10. Getting started
+## 13. Getting started
 
 No installs needed. Start a small local web server from the project folder:
 
@@ -287,9 +269,8 @@ No installs needed. Start a small local web server from the project folder:
 python3 -m http.server 8000
 ```
 
-Then open <http://localhost:8000> on your computer.
-To try it on your phone, connect it to the same Wi-Fi and open `http://<your-computer's-IP>:8000`.
-(Find the IP in System Settings → Wi-Fi → Details.)
+- App: <http://localhost:8000> (add `?open` to skip the cover, or `?page=3` to open at page 3)
+- Tests: open the files in `tests/` in the browser, e.g. <http://localhost:8000/tests/flip-test.html>. Every line should say PASS.
 
 **Live version:** every merge into `main` is published automatically to GitHub Pages.
 
