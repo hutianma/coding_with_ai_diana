@@ -1,281 +1,209 @@
-# 📒 Photocard Binder
+# 💖 Pocket Fandom
 
-A digital photocard binder for showing off your celebrity and idol photocard collection. You flip through pages with a realistic 3D page-turn, just like a real binder with plastic sleeves.
+**A personal fan-merch workshop.**
+Turn the photos on your phone into your own digital fan merch (photocards, badges, polaroids, acrylic stands), keep them in a 3D binder, and make pages pretty enough to share.
 
-> **Status:** planning stage. This README is the project plan.
-
----
-
-## 1. The idea
-
-Collectors keep photocards in binders with clear pocket sleeves, and part of the fun is flipping through the pages. This project recreates that online:
-
-- Cards sit in **pocket sleeves** (2×2 or 3×3 per page) with a glossy plastic shine.
-- You **drag or swipe** to turn a page. The page bends, casts a shadow, and lands on the other side.
-- You can **tap a card** to lift it out of its sleeve, spin it in 3D, and see the back.
-- Cards come from **your own photo library**, so you can add a card straight from the Photos app.
+> *Working title, so the name may change.*
+> **Status:** Phase 1 (single-player workshop) in progress.
+> The binder with 3D page turning is live: <https://hutianma.github.io/coding_with_ai_diana/>
 
 ---
 
-## 2. Platform decision
+## 1. Why this exists
 
-| Option | What's possible | Verdict |
-|---|---|---|
-| **Plugin inside Apple Photos** | Apple only allows *Photo Editing Extensions*, which edit a single photo. You can't add a custom viewer or binder inside Photos. | ❌ Not possible |
-| **Share Extension** ("Add to Binder" in the Photos share sheet) | You select photos in Photos, tap Share, then tap **Add to Binder**, and the photos are sent to our app. | ✅ This is how we "plug into" Photos |
-| **Web app (PWA)** | Runs in Safari on iPhone, iPad and computers, and can be added to the home screen. Can pick photos from your library. | ✅ **Start here**: fastest to build and share |
-| **Native iOS app (SwiftUI)** | Best performance, works offline, includes the Share Extension, and can go on the App Store. | ✅ **Phase 2** |
+Fans love making, collecting and showing off merch: photocard binders, ita bags, journals, decorated toploaders. Today that happens with real paper and plastic, or with photo-editing apps that weren't made for it.
 
-**Plan:** build the **web prototype first** to perfect the page-turn animation and design. Then turn it into a **native iOS app with a Photos Share Extension**.
+Pocket Fandom is a **workshop for one person first**:
+
+- **Make** merch from your own photos, with the details fans care about (card backs, rounded corners, holo foil, signatures).
+- **Collect & organize** it in a binder that feels real, with 3D page turns and plastic sleeves.
+- **Play** with it: tilt cards to make them shine, flip them over, seal them in an envelope and unbox them.
+- **Share** it: export binder pages as images or short page-flip videos for Xiaohongshu, Weibo or Instagram.
+
+### Why single-player first?
+A social platform needs creators *and* fans before it's fun: the cold-start problem. A tool that's fun **on your own** doesn't need anyone else to work.
+The "social" part happens on platforms fans already use: they post what they made, and their friends ask *"what app is this?"*.
+If people like it, sharing features grow step by step (see [§8 Later](#8-later-from-workshop-to-community)).
+
+---
+
+## 2. Core loop (Phase 1)
+
+```
+ Pick photos → Make merch → Put it in the binder / ita bag / journal → Decorate → Share
+      ↑                                                                        │
+      └────────────────────────── "I want to make more" ───────────────────────┘
+```
 
 ---
 
 ## 3. Features
 
-### MVP (must have)
-- [x] Binder cover screen. Tap it to open.
-- [ ] Pages with 2×2 or 3×3 card pockets.
-- [x] **3D page turn**: drag the page edge to flip it, or tap the arrows.
-- [ ] Add cards from your photo library and crop them to photocard ratio (**55 × 85 mm**, about 2:3.1).
-- [ ] Rearrange cards by dragging. Remove cards.
-- [ ] Collection saved on the device, so it's still there after you close the app.
+### 🛠️ Merch Workshop
+| Item | Details |
+|---|---|
+| **Photocard** | 55 × 85 mm ratio, front + back design, rounded corners, finish (matte / glossy / holo), handwritten signature or text |
+| **Badge (吧唧)** | Round button badge with a glossy dome effect |
+| **Polaroid** | White frame with a handwritten caption |
+| **Acrylic stand** | Cut-out figure on a clear base (subject cut-out on the device) |
+| **Stickers** | Cut-out stickers to decorate pages and covers |
 
-### Nice to have
-- [ ] Tap a card to lift it out, spin it in 3D, and see its front and back.
-- [ ] Holographic or glossy shine that moves when you tilt the phone (gyroscope).
-- [ ] Several binders, for example one per group or artist, with custom covers and colors.
-- [ ] Tags for each card: artist, group, album, era, and whether it's rare.
-- [ ] Search and filter ("show all cards from album X").
-- [ ] Page-flip sound and a small vibration.
-- [ ] Share a page as an image or short video for social media.
-- [ ] Optional account and cloud sync (iCloud / Sign in with Apple).
+### 📒 Collect & organize
+- **Binder** (already built): pockets, plastic sleeve shine, 3D page turning by dragging or tapping.
+- **Ita bag (痛包)** display: arrange badges and cards behind a clear window.
+- **Journal (手账) pages:** free layout with stickers, washi tape and text.
+- **DIY binder cover:** color, material, stickers, a photo window.
+
+### ✨ Play
+- Tap a card to lift it out and **flip it over** to see the back.
+- **Tilt + glare** and **holo foil** that move with the mouse or the phone's tilt.
+- **Unboxing mini-game:** seal cards in an envelope or album, then peel, open and reveal them.
+
+### 📤 Share
+- Export a binder page, ita bag or journal page as an **image**.
+- Export a short **page-flip video/GIF**.
+- Exports never include anything you didn't choose to show.
 
 ---
 
-## 4. Tech stack
+## 4. Roadmap
 
-### Phase 1: Web prototype
+Each milestone (M#) is one branch, built and reviewed as described in [WORKFLOW.md](WORKFLOW.md).
+
+### Phase 1: Single-player workshop
+
+| Milestone | Goal | Done when… | Status |
+|---|---|---|---|
+| **M0: Setup** | App skeleton, auto-deploy to GitHub Pages | The page is live at a public link | ✅ Done |
+| **M1: Binder** | Cover, binder pages, 2×2 pockets, placeholder cards | Looks like a binder on phone and computer | ✅ Done |
+| **M2: Page turn** | 3D page flip with arrows and keyboard | Pages flip smoothly at 60 fps | ✅ Done |
+| **M3: Drag to flip** | The page follows your finger, snaps or springs back | Feels natural on iPhone | ✅ Done |
+| **M4: Photocard Workshop** | Pick photos → crop to 55:85 → design the back → saved on the device → appears in the binder | Make 6 cards, reload, and they're still in the binder | ⬜ |
+| **M5: Card effects** | Tap to lift and flip a card, tilt + glare, holo foil | Cards feel like real objects | ⬜ |
+| **M6: More merch** | Badges, polaroids, acrylic stands | Make one of each from your photos | ⬜ |
+| **M7: Decorate** | DIY binder cover, stickers, a journal page or ita bag display | A page you'd be proud to show | ⬜ |
+| **M8: Share** | Export images and page-flip videos | Post one to social media straight from the app | ⬜ |
+| **M9: Unboxing mini-game** *(optional)* | Seal cards in an envelope/album, then unbox them | Opening feels like a ritual | ⬜ |
+
+### How we'll know Phase 1 works
+1. **Diana uses it herself for two weeks.** Does she keep coming back?
+2. **Post exports on Xiaohongshu.** Do people react, and does anyone ask what app it is?
+3. **3–5 friends try it** on their phones: what's fun, and what's confusing?
+
+---
+
+## 5. How it works (tech)
+
+### Stack
 | Part | Choice | Why |
 |---|---|---|
-| Language | HTML + CSS + JavaScript (ES modules) | Simple, no setup needed |
-| Build tool | **None**: files are served exactly as they are | Nothing to install; libraries like Three.js load from a CDN when needed |
-| 3D page turn (simple) | **CSS 3D transforms** (`perspective`, `rotateY`, `backface-visibility`) | Smooth, light, good for a first version |
-| 3D page turn (realistic bend) | **Three.js**: a page mesh whose vertices are bent along a curl | A real paper-curl look |
-| Gestures | Pointer Events (drag progress → rotation angle) | Works with mouse and touch |
-| Storage | **IndexedDB** (built into the browser) | Can store many images on the device |
-| Hosting | GitHub Pages / Vercel | Free, one link to share |
+| App | Plain HTML + CSS + JavaScript (ES modules), **no build step** | Simple, nothing to install |
+| 3D effects | CSS 3D transforms | Smooth and light; Three.js only if we need paper curl later |
+| Storage | **IndexedDB** on the device | Holds many images; photos never leave the phone |
+| Cut-outs (stands, stickers) | On-device background removal (later milestone) | No uploads |
+| Export | `<canvas>` for images; `MediaRecorder` for page-flip videos | Works in the browser |
+| Hosting | GitHub Pages | Free; every merge to `main` goes live |
 
-### Phase 2: Native iOS
-| Part | Choice |
-|---|---|
-| App UI | SwiftUI |
-| 3D page turn | SceneKit or RealityKit (bent page mesh), or `UIPageViewController` with `.pageCurl` as a quick fallback |
-| Photo access | `PhotosPicker` (PhotosUI) |
-| Photos integration | **Share Extension** target → "Add to Binder" |
-| Storage | SwiftData + image files in the app's storage |
-| Sync (optional) | CloudKit |
-| Tilt shine | CoreMotion |
+### Page turning (built in M2–M3)
+- The binder is a stack of **leaves** (sheets), each with a front and back face, rotating around the spine with CSS `rotateY` (`src/binder/PageFlip.js`).
+- Dragging maps finger distance to turn progress. On release, the page finishes turning if it's past halfway or flicked; otherwise it springs back.
+- Only pages near the current one are built, so big binders stay fast.
+- **Reduce Motion** replaces the 3D turn with a short fade.
 
----
-
-## 5. How the page turn works
-
-### Version A: CSS 3D (start here)
-```
- ┌──────────── binder (perspective: 2000px) ────────────┐
- │  left page (static)  ║  right page (flippable)       │
- │                      ║  ┌ front face ┐               │
- │                      ║  └ back face  ┘ (rotateY 180) │
- └──────────────────────╨───────────────────────────────┘
-                       spine = transform-origin: left center
-```
-1. Each page is a `div` with a **front** and a **back** face (`backface-visibility: hidden`).
-2. `transform-origin` sits on the **spine** (the left edge).
-3. As you drag, `progress = dragDistance / pageWidth` (from 0 to 1), so `rotateY(-progress * 180deg)`.
-4. When you let go, the page finishes the flip if progress is over 0.5, and springs back if not (easing curve).
-5. For depth, a shadow gradient on the page underneath gets stronger as the page lifts. A highlight moves across the turning page.
-
-### Version B: Three.js paper curl (upgrade)
-1. Each page is a `PlaneGeometry` with many segments across its width (for example 40).
-2. Every frame, each vertex is bent around a **cylinder** whose position follows the drag. This makes the page curl instead of turning like a stiff board.
-3. The card textures (`CanvasTexture`) are drawn onto the page. A second slightly transparent layer with a reflective material acts as the plastic sleeve.
-4. Soft shadows come from a directional light with shadow maps.
-
-### Plastic sleeve and shine effect
-- Each pocket is a slightly transparent layer with a **diagonal white gradient** on top.
-- The gradient angle follows the pointer or the phone's tilt, which makes the plastic shine.
-- Holo cards get a rainbow layer (`mix-blend-mode: color-dodge`).
-
----
-
-## 5b. Making photos look 3D (the image changes with the viewing angle)
-
-Goal: when you **tilt your phone** or **move your mouse**, each photocard looks like a real object with depth. It isn't a flat picture.
-
-**What controls the angle**
-- 📱 Phone: gyroscope (`DeviceOrientationEvent`; iPhone Safari needs a one-time "Allow motion" button) / CoreMotion in the iOS app.
-- 💻 Computer: mouse position over the card.
-- The tilt is limited to about ±15° and smoothed, so it feels calm and doesn't jitter.
-
-There are four levels of the effect, from easiest to most impressive:
-
-| Level | Effect | How it works | Difficulty |
+### Making cards look 3D
+| Level | Effect | How | When |
 |---|---|---|---|
-| **1. Tilt + glare** | The card leans toward you and a shiny streak slides across it | CSS `rotateX/rotateY` + a moving gradient layer | ⭐ Easy |
-| **2. Holo foil** | Rainbow shimmer that shifts with the angle, like holographic cards | Rainbow gradient + sparkle texture, `mix-blend-mode: color-dodge`, offset by the tilt | ⭐⭐ |
-| **3. Pop-out layers** | The person floats **in front of** the background, and the two move at different speeds | Cut the subject out of the photo (on-device AI), then stack 2–3 layers at different depths (`translateZ`) | ⭐⭐⭐ |
-| **4. Depth map** | The whole photo has real depth, like *Spatial Scenes* in the iOS Photos app | Get a depth map (an image where brightness means distance). WebGL shifts each pixel based on its depth and the tilt angle | ⭐⭐⭐⭐ |
+| 1. Tilt + glare | The card leans and a shine slides across it | CSS `rotateX/Y` + moving gradient, from the mouse or gyroscope | M5 |
+| 2. Holo foil | A rainbow shimmer that shifts with the angle | Rainbow gradient, `mix-blend-mode: color-dodge` | M5 |
+| 3. Pop-out layers | The subject floats in front of the background | On-device background removal → layers at different depths | Later |
+| 4. Depth map | The whole photo has real depth | AI depth map + WebGL shader | Later |
 
-**Where the cut-outs (Level 3) and depth maps (Level 4) come from**
-- **Web:** cut-outs from on-device background removal (e.g. `@imgly/background-removal`); depth from an AI depth model running in the browser (e.g. *Depth Anything* via `transformers.js`).
-- **iOS:** cut-outs from Apple's Vision framework (`VNGenerateForegroundInstanceMaskRequest`, the same as "lift subject" in Photos). Depth comes from **Portrait mode photos, which already store real depth data** (`AVDepthData`), or from an AI depth model for other photos.
-- Everything runs **on the device**, so photos are never uploaded.
-- Each result is calculated once when a card is added, then saved with the card, so later viewing stays fast.
-
-**Bonus: lenticular cards.** Some real photocards change picture when you tilt them. You choose 2–3 photos, and the card blends between them depending on the angle.
-
-**Rules so it feels good**
-- The 3D effect runs only on the card you're looking at or holding, not on all 9 cards at once, so the app stays smooth.
-- Turned off during page turns, and replaced by a still image when *Reduce Motion* is on.
+Only the card in focus is animated, and Reduce Motion shows a still image.
 
 ---
 
-## 5c. Future ideas (later, after the main plan)
-
-### 🎨 DIY binder cover
-Users design their own cover, like decorating a real binder:
-- Choose a cover color or material (leather, glitter, clear plastic, pastel).
-- Add a photo or a photocard to a **front window** on the cover.
-- **Stickers:** hearts, stars, the group's logo, or your own images. Drag them on, then resize and rotate them.
-- Text in fun fonts, such as the idol's name, the group's name, or a fan-club name.
-- Spine label and ribbon or charm decorations.
-- The cover is saved as a list of stickers and settings, not as a flat image, so it can be edited again later.
-
-### 🎵 Music for each page
-When you open a page, its own song plays, such as the song from that stage performance or the idol's signature song.
-- Each page (or the whole binder) can be given a **theme song**, with a start time (e.g. jump to the chorus).
-- Music **fades** from one song to the next as you turn the page.
-- Play/pause and mute buttons. Music never starts by surprise; the user taps once to turn music on (browsers require this anyway).
-
-**Where the music comes from (copyright-safe options).** The app must not include or upload songs. Instead:
-| Source | How |
-|---|---|
-| **Apple Music** | MusicKit (web: MusicKit JS, iOS: MusicKit). Plays full songs for subscribers and 30-second previews for everyone else |
-| **Spotify / YouTube** | Official embedded players linked to a song or stage video |
-| **Song previews** | iTunes Search API: free 30-second previews, with no account needed |
-| **Your own files** | The user picks an audio file stored on their own device |
-
----
-
-## 6. Data model
+## 6. Data model (Phase 1)
 
 ```ts
-Binder {
+Card {
   id: string
-  name: string            // "SEVENTEEN binder"
-  coverColor: string
-  cover?: CoverDesign     // DIY cover (future)
-  themeSong?: Song        // default music for the whole binder (future)
-  layout: "2x2" | "3x3"
-  pages: Page[]
+  front: Blob             // photo cropped to 55:85, about 600px tall
+  back: CardBack          // { color, pattern, text?, photo? }
+  finish: "matte" | "glossy" | "holo"
+  signature?: Blob        // handwritten, drawn with a finger
+  tags: string[]          // e.g. member, album, era
+  createdAt: Date
 }
 
-Page {
+Merch {                   // M6
   id: string
-  slots: (CardId | null)[]   // 4 or 9 slots
-  song?: Song                // overrides binder themeSong (future)
+  kind: "badge" | "polaroid" | "stand" | "sticker"
+  image: Blob
+  caption?: string
+}
+
+Binder {
+  id: string
+  name: string
+  cover: CoverDesign       // M7
+  layout: "2x2" | "3x3"
+  pages: { id: string, slots: (CardId | null)[] }[]
 }
 
 CoverDesign {
   material: "leather" | "glitter" | "clear" | "pastel"
   color: string
-  windowCardId?: CardId
+  windowCardId?: string
   stickers: { image: string, x: number, y: number, scale: number, rotation: number }[]
-  texts: { content: string, font: string, color: string, x: number, y: number }[]
-}
-
-Song {
-  title: string
-  artist: string
-  source: "appleMusic" | "spotify" | "youtube" | "preview" | "localFile"
-  ref: string             // song ID, URL, or local file key
-  startAt?: number        // seconds, e.g. jump to the chorus
-}
-
-Card {
-  id: string
-  frontImage: Blob        // cropped to 55:85
-  backImage?: Blob
-  artist?: string
-  group?: string
-  album?: string
-  tags: string[]
-  finish: "matte" | "glossy" | "holo"
-  effect: "none" | "tilt" | "popout" | "depth" | "lenticular"
-  subjectMask?: Blob      // cut-out of the person (Level 3)
-  depthMap?: Blob         // grayscale depth image (Level 4)
-  lenticularImages?: Blob[]
-  addedAt: Date
 }
 ```
 
 ---
 
-## 7. Planned project structure (Phase 1)
+## 7. Project structure
 
 ```
 coding_with_ai_diana/
-├── README.md
+├── README.md               # this plan
+├── WORKFLOW.md             # how each milestone is built
+├── CLAUDE.md               # rules for Claude Code
 ├── index.html
 ├── .github/workflows/
-│   └── deploy.yml           # publishes main to GitHub Pages
-├── public/
-│   └── sample-cards/        # placeholder art for demos (NOT real celebrity photos)
+│   └── deploy.yml          # publishes main to GitHub Pages
+├── tests/                  # automated browser tests (open in a browser)
 └── src/
-    ├── main.js              # app entry
-    ├── binder/
-    │   ├── Binder.js        # pages, current spread, navigation
-    │   ├── PageFlip.js      # drag → rotation, snapping, easing
-    │   └── Sleeve.js        # pocket + plastic glare
-    ├── cards/
-    │   ├── CardPicker.js    # pick a photo from the library
-    │   ├── Cropper.js       # crop to photocard ratio
-    │   └── CardViewer.js    # tap-to-inspect 3D card
-    ├── storage/
-    │   └── db.js            # IndexedDB save/load
+    ├── main.js             # app entry
+    ├── binder/             # binder pages, page flip, pockets
+    ├── cards/              # drawing cards
+    ├── data/               # sample data (placeholder art only)
     └── styles/
-        ├── base.css
-        ├── binder.css
-        └── sleeve.css
 ```
+Planned folders: `src/workshop/` (making merch), `src/storage/` (IndexedDB), `src/share/` (export).
 
 ---
 
-## 8. Roadmap
+## 8. Later: from workshop to community
 
-| Milestone | Goal | Done when… |
-|---|---|---|
-| **M0: Setup** | App skeleton, deploy to GitHub Pages | The empty page is live at a public link |
-| **M1: Static binder** | Cover plus a 2×2 page grid with placeholder cards | Looks like a binder on phone and computer |
-| **M2: Page turn v1** | CSS 3D flip with tap arrows | Pages flip smoothly at 60 fps |
-| **M3: Drag to flip** | Pointer and touch dragging with snapping | Feels natural on iPhone Safari |
-| **M4: Add your cards** | Photo picker + crop + save to IndexedDB | Cards are still there after a reload |
-| **M5: Polish** | Sleeve shine, shadows, sound, card inspect view | Friends say "wow" 😄 |
-| **M5b: 3D photos** | Tilt + glare → holo → pop-out layers → depth map | The photo changes when you tilt the phone |
-| **M6: Page turn v2** | Three.js curling paper | The page visibly bends while dragged |
-| **M7: iOS app** | SwiftUI app + Photos **Share Extension** | "Add to Binder" works from the Photos app |
-| **M8: Extras** | Multiple binders, tags, search, sharing, iCloud sync | — |
-| **M9: DIY cover** | Cover editor with materials, stickers, text, and a front window | You can design a cover and edit it again later |
-| **M10: Page music** | A theme song for each page, with fading between songs | Turning a page changes the song |
+Only if Phase 1 shows people want it, and one step at a time:
+
+| Step | Idea |
+|---|---|
+| **Gift links** | Seal cards in an envelope and send a link; a friend unboxes it and keeps the cards. |
+| **Small circles** | Shared binders or collections for a group of friends in the same fandom. |
+| **Online fan event** | Creators' booths with free limited items (无料): numbered copies ("No. 023 / 100"), creator notes, time-limited. |
+| **Fan creations** | Fan artists turn their own artwork into collectible cards, with permissions they choose (collect, download, remix). |
+| **Native iOS app** | Real haptics, a Photos share-sheet "Add to Pocket Fandom", depth data from Portrait photos. |
+
+These need accounts, a backend and content moderation, so they're deliberately out of Phase 1.
 
 ---
 
-## 9. Things to keep in mind
+## 9. Privacy & content rules
 
-- **Copyright and privacy:** celebrity photos and official photocards belong to their owners. The app only shows photos **from your own library on your own device**. It does not ship or host any celebrity images. Demo assets use placeholder art.
-- **Performance:** make thumbnails smaller (for example 600 px tall) so big binders stay smooth. Only draw the pages next to the one you're on.
-- **Accessibility:** offer arrow buttons and keyboard navigation (← →) as well as dragging, and follow the *Reduce Motion* setting by using a simple fade instead of the flip.
-- **iPhone Safari quirks:** test 3D transforms and the photo picker on a real device early.
+- **Your photos stay on your device.** Phase 1 has no accounts and no uploads.
+- The app is for **personal use**. When you share exports, respect photographers', artists' and agencies' rights, as fans already do when posting their collections.
+- **The repo only contains placeholder art**: no real people's photos and no copyrighted images or music.
+- Anything public in later phases will need upload rules, reporting and moderation first.
 
 ---
 
@@ -287,9 +215,8 @@ No installs needed. Start a small local web server from the project folder:
 python3 -m http.server 8000
 ```
 
-Then open <http://localhost:8000> on your computer.
-To try it on your phone, connect it to the same Wi-Fi and open `http://<your-computer's-IP>:8000`.
-(Find the IP in System Settings → Wi-Fi → Details.)
+- App: <http://localhost:8000> (add `?open` to skip the cover, or `?page=3` to open at page 3)
+- Tests: open the files in `tests/` in the browser, e.g. <http://localhost:8000/tests/flip-test.html>. Every line should say PASS.
 
 **Live version:** every merge into `main` is published automatically to GitHub Pages.
 

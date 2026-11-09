@@ -1,6 +1,6 @@
 # 🛠️ Build Workflow
 
-How we build the Photocard Binder step by step. [README.md](README.md) says **what** we're building. This file says **how** we build it, one milestone at a time.
+How we build **Pocket Fandom** step by step. [README.md](README.md) says **what** we're building. This file says **how** we build it, one milestone at a time.
 
 ---
 
@@ -37,7 +37,7 @@ A milestone is finished only when **all** of these are true:
 - [ ] Animations feel smooth, with no jitter (aim for 60 fps).
 - [ ] It works with **Reduce Motion** turned on (simple fade instead of 3D).
 - [ ] No errors in the browser console.
-- [ ] No celebrity photos committed to the repo. Use only placeholder art.
+- [ ] No real people's photos or copyrighted images committed to the repo. Use only placeholder art.
 - [ ] The README checklist is updated.
 
 ---
@@ -79,61 +79,54 @@ A milestone is finished only when **all** of these are true:
 ### M3: Drag to flip
 1. Pointer Events: drag distance → `progress` (0 → 1) → rotation angle.
 2. When you let go: if `progress > 0.5` **or** the swipe is fast, finish the flip; otherwise spring back.
-3. Stop the page from scrolling during the drag (`touch-action: none`).
+3. Sideways drags turn pages; up/down scrolling and pinch-zoom still work (`touch-action: pan-y pinch-zoom`).
 4. ✅ **Check:** on the iPhone, dragging feels like a real page.
 
-### M4: Add your cards
-1. "Add card" button → photo picker (`<input type="file" accept="image/*" multiple>`).
+### M4: Photocard Workshop
+1. "New card" button → photo picker (`<input type="file" accept="image/*" multiple>`).
 2. Crop screen locked to the 55:85 ratio (drag and pinch to frame the photo).
-3. Make smaller copies (about 600 px tall), then save them to **IndexedDB** (`storage/db.js`).
-4. Place new cards in the next empty pocket. Drag cards to rearrange them. Long-press a card to remove it.
-5. ✅ **Check:** add 20 cards, reload the page, and they're all still there.
+3. Card back designer: color, pattern, short text (or a second photo).
+4. Make smaller copies (about 600 px tall) and save cards to **IndexedDB** (`src/storage/db.js`).
+5. New cards go into the binder's next empty pockets; the placeholder cards go away once you have your own.
+6. A "My cards" list to edit and delete cards.
+7. ✅ **Check:** make 6 cards, reload the page, and they're still in the binder.
 
-### M5: Polish
-1. Sleeve shine layer on each pocket.
-2. Tap a card → it lifts out → you can spin it in 3D and see the back.
-3. Page-flip sound + vibration (where supported).
-4. ✅ **Check:** Diana's "wow" test 😄
+### M5: Card effects
+1. Tap a card → it lifts out of the pocket → flip it to see the back.
+2. **Tilt + glare:** mouse on computers, gyroscope on phones (with an "Enable motion" button for iOS).
+3. **Holo foil** for cards whose finish is `"holo"`.
+4. Handwritten **signature** drawn with a finger, shown on the card.
+5. Only the card in focus is animated; Reduce Motion shows a still image.
+6. ✅ **Check:** tilting the phone clearly changes the card, and the app stays smooth.
 
-### M5b: 3D photos (one level at a time)
-1. **Level 1:** tilt + glare. Mouse on computers, gyroscope on phones (with an "Enable motion" button for iOS).
-2. **Level 2:** holo foil layer for cards whose finish is `"holo"`.
-3. **Level 3:** pop-out layers. Cut out the person with background removal on the device, save the cut-out, and show the layers at different depths.
-4. **Level 4:** depth map. Run a depth model on the device, then a WebGL shader moves each pixel based on depth and tilt.
-5. Only the card you're focused on is animated in 3D.
-6. ✅ **Check:** tilting the phone clearly changes the photo, and the app stays smooth.
+### M6: More merch
+1. **Badge:** round crop + glossy dome effect.
+2. **Polaroid:** white frame + handwritten caption.
+3. **Acrylic stand:** cut out the subject on the device, put it on a clear base.
+4. A shelf view to see all your merch.
+5. ✅ **Check:** make one of each from your own photos.
 
-### M6: Page turn v2 (Three.js curl)
-1. Three.js scene with a bendable page mesh (about 40 segments across).
-2. Bend the page around a cylinder that follows the drag.
-3. Draw the cards onto the page, plus the plastic sleeve material and soft shadows.
-4. Keep the CSS version as a backup for older phones.
-5. ✅ **Check:** the page visibly curls while you drag it.
-
-### M7: iOS app
-1. Xcode project: SwiftUI app + **Share Extension** target.
-2. Rebuild the binder view in SwiftUI using the web version as the design guide.
-3. `PhotosPicker` for adding cards, SwiftData for saving them.
-4. Share Extension: "Add to Binder" in Photos → the cards appear in the app.
-5. 3D photos: Vision cut-outs + depth data from Portrait mode photos.
-6. ✅ **Check:** running on Diana's iPhone through Xcode.
-
-### M8: Extras
-Multiple binders · tags · search and filter · share a page as an image or video · iCloud sync. **Each one is its own small branch.**
-
-### M9: DIY cover
-1. Cover editor: material, color, and front window.
+### M7: Decorate
+1. DIY binder cover: material, color, photo window, stickers.
 2. Sticker layer: drag on, resize, rotate, delete.
-3. Text tool with fonts.
-4. Save as a `CoverDesign` (editable later, not a flat image).
-5. ✅ **Check:** design a cover, reload the page, and edit it again.
+3. A journal page **or** an ita bag display (Diana picks which first).
+4. Saved as editable settings, not flat images.
+5. ✅ **Check:** decorate a page, reload, and edit it again.
 
-### M10: Page music
-1. Pick a song for a page or the whole binder: preview search, or an audio file from the phone.
-2. Player with fade-in and fade-out between pages, and a start time (jump to the chorus).
-3. A tap to turn music on, plus a mute button.
-4. Later: Apple Music or Spotify playback.
-5. ✅ **Check:** turning a page smoothly switches the song.
+### M8: Share
+1. Export the current binder spread / journal page / ita bag as a PNG.
+2. Export a short page-flip video (WebM/MP4 via `MediaRecorder`) or GIF.
+3. Share sheet on phones (`navigator.share`), download on computers.
+4. ✅ **Check:** post one export to social media straight from the phone.
+
+### M9: Unboxing mini-game (optional)
+1. Seal chosen cards in an envelope or album.
+2. Peel the shrink-wrap, open the flap or lid, flip through, reveal the cards one by one.
+3. Sound effects + vibration where supported; Reduce Motion gets simple fades.
+4. ✅ **Check:** opening feels like a ritual, not a button.
+
+### After Phase 1
+Check the signals in the README ("How we'll know Phase 1 works"). Then pick the next steps from the README's "Later" table and split them into milestones (M10, M11, …). **Each one is its own branch.**
 
 ---
 
@@ -157,6 +150,7 @@ Just say one of these:
 - Follow [README.md](README.md) for **what** to build and this file for **how**.
 - Keep `main` working. Do all work on a milestone branch.
 - Small commits, one task each. Never push or merge without Diana's OK.
-- Never add real celebrity photos or copyrighted music to the repo.
+- Never add real people's photos, copyrighted images or copyrighted music to the repo.
 - Plain JavaScript first, and no new libraries unless the README lists them or Diana agrees.
 - After each task, explain briefly what changed and how to see it.
+- Everything that goes to GitHub (code, comments, commits, docs) is written in **English**.
