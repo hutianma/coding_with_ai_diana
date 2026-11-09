@@ -17,7 +17,7 @@ let win, doc, book;
 
 function load(w, h, q) {
   f.style.width = w + 'px'; f.style.height = h + 'px';
-  return new Promise(r => { f.onload = r; f.src = '/index.html?' + q; }).then(async () => {
+  return new Promise(r => { f.onload = r; f.src = '/index.html?demo&' + q; }).then(async () => {
     await wait(100);
     win = f.contentWindow; doc = win.document;
     let now = 0;

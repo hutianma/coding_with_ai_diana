@@ -7,7 +7,9 @@ const phoneQuery = matchMedia('(max-width: 700px)');
 // Shows the binder as one book. It starts closed on its cover; open it by
 // tapping or dragging the cover, or with the arrows / ← → keys.
 // startPage: 0 = closed on the cover, 1+ = open at that page.
-export function mountBinder(root, binder, { startPage = 0 } = {}) {
+// toolbarEnd / notice: optional elements shown at the right of the toolbar / under it.
+// fadeIn: fade the binder in (off when redrawing after a change).
+export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true } = {}) {
   // A binder always has at least one (empty) page, so it can be opened
   const pages = binder.pages.length ? binder.pages : [emptyPage(binder.layout)];
 
@@ -15,7 +17,7 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
   let focusPage = clamp(Math.floor(startPage) || 0, 0, pages.length);
 
   const view = document.createElement('div');
-  view.className = 'binder-view';
+  view.className = fadeIn ? 'binder-view' : 'binder-view binder-view--still';
 
   const toolbar = document.createElement('header');
   toolbar.className = 'toolbar';
@@ -27,6 +29,7 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
   // textContent (not innerHTML) so names are always shown as plain text
   toolbar.querySelector('.toolbar__title').textContent = binder.name;
   const backBtn = toolbar.querySelector('.toolbar__back');
+  if (toolbarEnd) toolbar.lastElementChild.replaceWith(toolbarEnd);
 
   const stage = document.createElement('div');
   stage.className = 'stage';
@@ -139,11 +142,15 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
   document.addEventListener('keydown', onKey);
   phoneQuery.addEventListener('change', buildBook);
 
-  view.append(toolbar, stage, nav);
+  view.append(toolbar);
+  if (notice) view.append(notice);
+  view.append(stage, nav);
   root.replaceChildren(view);
   buildBook();
 
   return {
+    // The page being looked at (0 = cover)
+    get page() { return focusPage; },
     destroy() {
       document.removeEventListener('keydown', onKey);
       phoneQuery.removeEventListener('change', buildBook);
