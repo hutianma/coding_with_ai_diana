@@ -1,5 +1,6 @@
 // The photocard workshop: pick photos → frame each one → design the back → save.
-import { DEFAULT_CROP, MAX_ZOOM, placement, clampCrop, panCrop, zoomCrop } from './crop.js';
+import { MAX_ZOOM } from './crop.js';
+import { createCropper } from './Cropper.js';
 import { loadImage, unloadImage, shrinkSource, renderCardFront, CARD_WIDTH, CARD_HEIGHT } from './imageTools.js';
 import { FINISHES } from '../cards/Card.js';
 import { createSignaturePad, PEN_COLORS } from './SignaturePad.js';
@@ -122,10 +123,12 @@ export function openWorkshop({ files, existing = null, onSave }) {
 
   const $ = (sel) => dialog.querySelector(sel);
   const title = $('.workshop__title');
-  const cropArea = $('.crop');
-  const frameEl = $('.crop__frame');
-  const cropImg = $('.crop__img');
-  const zoomInput = $('.workshop__zoom input');
+  const cropper = createCropper({
+    area: $('.crop'),
+    frame: $('.crop__frame'),
+    img: $('.crop__img'),
+    zoomInput: $('.workshop__zoom input'),
+  });
   const textInput = $('.workshop__text input');
   const errorEl = $('.workshop__error');
   const primary = $('.workshop__primary');
@@ -139,7 +142,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
   let index = 0; // which photo we're on
   let step = 'crop';
   let image = null; // the loaded <img>
-  let crop = { ...DEFAULT_CROP };
+  let crop = null; // how the photo is framed, taken from the cropper when leaving the crop step
   let back = existing ? { ...existing.back } : { ...lastBack };
   let finish = existing?.finish ?? lastFinish;
   let previewUrl = null;
@@ -168,8 +171,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
     }
     setBusy(false);
     showError(skipped ? `${skipped} photo${skipped > 1 ? 's' : ''} couldn't be opened and ${skipped > 1 ? 'were' : 'was'} skipped. Try JPEG or PNG.` : '');
-    crop = existing?.crop ? { ...existing.crop } : { ...DEFAULT_CROP };
-    cropImg.src = image.src;
+    cropper.setImage(image, existing?.crop ?? null);
     try {
       await pad.reset(existing?.signature ?? null);
     } catch {
@@ -188,9 +190,9 @@ export function openWorkshop({ files, existing = null, onSave }) {
       title.textContent = (existing ? 'Edit card' : 'New card') + counter;
       secondary.textContent = 'Cancel';
       primary.textContent = 'Next: signature';
-      drawCrop(); // place the photo right away (no flash of an unplaced photo)…
-      requestAnimationFrame(drawCrop); // …and again once the layout has settled
+      cropper.draw();
     } else if (name === 'sign') {
+      crop = { ...cropper.crop };
       title.textContent = 'Sign it (optional)' + counter;
       secondary.textContent = 'Back';
       primary.textContent = 'Next: card back';
@@ -213,30 +215,6 @@ export function openWorkshop({ files, existing = null, onSave }) {
     primary.hidden = true;
     secondary.textContent = 'Close';
     step = 'none';
-  }
-
-  function frameSize() {
-    const r = frameEl.getBoundingClientRect();
-    return { width: r.width, height: r.height };
-  }
-
-  function imageSize() {
-    return { width: image.naturalWidth, height: image.naturalHeight };
-  }
-
-  function drawCrop() {
-    if (!image) return;
-    const frame = frameSize();
-    if (!frame.width) return;
-    crop = clampCrop(imageSize(), frame, crop);
-    const box = placement(imageSize(), frame, crop);
-    Object.assign(cropImg.style, {
-      left: `${box.left}px`,
-      top: `${box.top}px`,
-      width: `${box.width}px`,
-      height: `${box.height}px`,
-    });
-    zoomInput.value = crop.zoom;
   }
 
   let previewToken = 0;
@@ -323,7 +301,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
   function close() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     unloadImage(image);
-    removeEventListener('resize', drawCrop);
+    cropper.destroy();
     dialog.close();
     dialog.remove();
   }
@@ -376,59 +354,6 @@ export function openWorkshop({ files, existing = null, onSave }) {
     back.text = textInput.value.slice(0, BACK_TEXT_MAX);
     drawBack();
   });
-
-  // ---------- Moving and zooming the photo ----------
-
-  const pointers = new Map(); // pointerId → { x, y }
-
-  cropArea.addEventListener('pointerdown', (event) => {
-    if (!image) return;
-    try { cropArea.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  });
-
-  cropArea.addEventListener('pointermove', (event) => {
-    const last = pointers.get(event.pointerId);
-    if (!last) return;
-    const frame = frameSize();
-    if (pointers.size === 1) {
-      crop = panCrop(imageSize(), frame, crop, event.clientX - last.x, event.clientY - last.y);
-    } else if (pointers.size === 2) {
-      // Pinch: zoom by how much the two fingers spread, around the point between them
-      const [a, b] = [...pointers.values()];
-      const other = a === last ? b : a;
-      const before = Math.hypot(last.x - other.x, last.y - other.y);
-      const after = Math.hypot(event.clientX - other.x, event.clientY - other.y);
-      const rect = frameEl.getBoundingClientRect();
-      const midX = (event.clientX + other.x) / 2 - rect.left;
-      const midY = (event.clientY + other.y) / 2 - rect.top;
-      if (before > 0) crop = zoomCrop(imageSize(), frame, crop, after / before, midX, midY);
-      crop = panCrop(imageSize(), frame, crop, (event.clientX - last.x) / 2, (event.clientY - last.y) / 2);
-    }
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    drawCrop();
-  });
-
-  const endPointer = (event) => pointers.delete(event.pointerId);
-  cropArea.addEventListener('pointerup', endPointer);
-  cropArea.addEventListener('pointercancel', endPointer);
-
-  cropArea.addEventListener('wheel', (event) => {
-    if (!image) return;
-    event.preventDefault();
-    const rect = frameEl.getBoundingClientRect();
-    const factor = Math.exp(-event.deltaY * 0.002);
-    crop = zoomCrop(imageSize(), frameSize(), crop, factor, event.clientX - rect.left, event.clientY - rect.top);
-    drawCrop();
-  }, { passive: false });
-
-  zoomInput.addEventListener('input', () => {
-    if (!image) return;
-    crop = zoomCrop(imageSize(), frameSize(), crop, Number(zoomInput.value) / crop.zoom);
-    drawCrop();
-  });
-
-  addEventListener('resize', drawCrop);
 
   document.body.append(dialog);
   dialog.showModal();
