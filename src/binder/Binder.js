@@ -2,6 +2,7 @@ import { createPage, createBlankPage } from './Sleeve.js';
 import { PageFlip } from './PageFlip.js';
 import { createPaging, pageLabel, clamp } from './paging.js';
 import { emptySlots } from './layout.js';
+import { openCardViewer } from '../cards/CardViewer.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
@@ -123,6 +124,24 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
     });
     updateNav();
   }
+
+  // Pick up a card from its pocket
+  function pickUp(cardEl) {
+    const card = binder.cards?.[cardEl.dataset.cardId];
+    if (card) openCardViewer(card, cardEl);
+  }
+  stage.addEventListener('click', (event) => {
+    const cardEl = event.target.closest?.('.card[data-card-id]');
+    if (cardEl) pickUp(cardEl);
+  });
+  stage.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const cardEl = event.target.closest?.('.card[data-card-id]');
+    if (cardEl) {
+      event.preventDefault();
+      pickUp(cardEl);
+    }
+  });
 
   prevBtn.addEventListener('click', () => flip.prev());
   nextBtn.addEventListener('click', () => flip.next());
