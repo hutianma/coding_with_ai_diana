@@ -53,6 +53,7 @@ If people like it, sharing features grow step by step (see [§8 Later](#8-later-
 - **Ita bag (痛包)** display: arrange badges and cards behind a clear window.
 - **Journal (手账) pages:** free layout with stickers, washi tape and text.
 - **DIY binder cover:** color, material, stickers, a photo window.
+- **DIY card backs:** upload your own image for the back, or decorate it with stickers and text.
 
 ### ✨ Play
 - Tap a card to lift it out and **flip it over** to see the back.
@@ -81,7 +82,7 @@ Each milestone (M#) is one branch, built and reviewed as described in [WORKFLOW.
 | **M4: Photocard Workshop** | Pick photos → crop to 55:85 → design the back → saved on the device → appears in the binder | Make 6 cards, reload, and they're still in the binder | ⬜ |
 | **M5: Card effects** | Tap to lift and flip a card, tilt + glare, holo foil | Cards feel like real objects | ⬜ |
 | **M6: More merch** | Badges, polaroids, acrylic stands | Make one of each from your photos | ⬜ |
-| **M7: Decorate** | DIY binder cover, stickers, a journal page or ita bag display | A page you'd be proud to show | ⬜ |
+| **M7: Decorate** | DIY binder cover, DIY card backs (your own image, stickers), a journal page or ita bag display | A page you'd be proud to show | ⬜ |
 | **M8: Share** | Export images and page-flip videos | Post one to social media straight from the app | ⬜ |
 | **M9: Unboxing mini-game** *(optional)* | Seal cards in an envelope/album, then unbox them | Opening feels like a ritual | ⬜ |
 

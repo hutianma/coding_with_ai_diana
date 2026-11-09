@@ -108,10 +108,11 @@ A milestone is finished only when **all** of these are true:
 
 ### M7: Decorate
 1. DIY binder cover: material, color, photo window, stickers.
-2. Sticker layer: drag on, resize, rotate, delete.
-3. A journal page **or** an ita bag display (Diana picks which first).
-4. Saved as editable settings, not flat images.
-5. ✅ **Check:** decorate a page, reload, and edit it again.
+2. DIY card backs: upload your own image for the back (cropped like the front), or decorate it with stickers and text.
+3. Sticker layer: drag on, resize, rotate, delete.
+4. A journal page **or** an ita bag display (Diana picks which first).
+5. Saved as editable settings, not flat images.
+6. ✅ **Check:** decorate a page, reload, and edit it again.
 
 ### M8: Share
 1. Export the current binder spread / journal page / ita bag as a PNG.
