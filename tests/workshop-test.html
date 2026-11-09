@@ -193,7 +193,7 @@ try {
   const input2 = doc.querySelector('input[type=file]');
   const dt2 = new win.DataTransfer(); dt2.items.add(new win.File(['nope'], 'x.jpg', { type: 'image/jpeg' }));
   input2.files = dt2.files; input2.dispatchEvent(new win.Event('change'));
-  await until(() => !doc.querySelector('.workshop__error').hidden);
+  await until(() => doc.querySelector('.workshop__error')?.hidden === false);
   check('if no photo can be opened, the workshop explains and offers Close',
     doc.querySelector('.workshop__primary').hidden && doc.querySelector('.workshop__secondary').textContent === 'Close', doc.querySelector('.workshop__error').textContent);
   doc.querySelector('.workshop__secondary').click(); await wait(100);

@@ -125,6 +125,8 @@ try {
   doc.querySelector('input[name="fill"][value="snow"]').click();
   primary().click();
   await until(() => doc.querySelector('dialog.my-cards[open]'));
+  const thumbFill = doc.querySelector('.my-cards__item .badge__fill');
+  check('shelf badges use a small fill canvas (saves memory)', thumbFill?.width === 240, thumbFill?.width);
   check('edited badge: still one badge, now snow', doc.querySelectorAll('.my-cards__item .badge').length === 1
     && /snow/.test(doc.querySelector('.my-cards__thumb').getAttribute('aria-label')));
   doc.querySelector('.my-cards__close').click(); await wait(100);
@@ -158,6 +160,7 @@ try {
   const pad = doc.querySelector('.polaroid-caption__pad');
   const pr = pad.getBoundingClientRect();
   const pe = (t, x) => pad.dispatchEvent(new win.PointerEvent(t, { bubbles: true, pointerId: 3, isPrimary: true, clientX: pr.left + x * pr.width, clientY: pr.top + pr.height / 2 }));
+  doc.querySelector('input[name="pen"][value="#e0508c"]').click(); // pink
   pe('pointerdown', 0.3); for (let i = 1; i <= 10; i++) pe('pointermove', 0.3 + i * 0.04); pe('pointerup', 0.7);
   primary().click();
   await until(() => doc.querySelector('.my-cards__tab[aria-selected="true"]')?.dataset.tab === 'polaroids');
@@ -176,6 +179,17 @@ try {
   check('picking up a wide polaroid keeps its shape', Math.abs(ratio - 108 / 86) < 0.01, ratio);
   doc.querySelector('dialog.viewer[open] .viewer__close').click();
   await until(() => !doc.querySelector('dialog.viewer[open]'), 3000);
+
+  // Edit remembers the caption pen
+  doc.querySelector('.my-cards__item [data-action="edit"]').click();
+  await until(() => title() === 'Edit polaroid');
+  primary().click();
+  await until(() => doc.querySelectorAll('.polaroid-edit__cell.has-photo').length === 2);
+  primary().click(); await until(() => title() === 'Caption');
+  check('editing a polaroid remembers the pink pen', doc.querySelector('input[name="pen"]:checked')?.value === '#e0508c');
+  doc.querySelector('dialog[open] .workshop__close').click(); await wait(100);
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  doc.querySelector('.my-cards__tab[data-tab="polaroids"]').click();
 
   // Delete
   win.confirm = () => true;
