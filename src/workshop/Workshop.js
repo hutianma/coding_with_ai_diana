@@ -1,6 +1,6 @@
 // The photocard workshop: pick photos → frame each one → design the back → save.
 import { DEFAULT_CROP, MAX_ZOOM, placement, clampCrop, panCrop, zoomCrop } from './crop.js';
-import { loadImage, shrinkSource, renderCardFront } from './imageTools.js';
+import { loadImage, unloadImage, shrinkSource, renderCardFront } from './imageTools.js';
 import { BACK_COLORS, BACK_PATTERNS, BACK_TEXT_MAX, DEFAULT_BACK, createCardBack } from '../cards/CardBack.js';
 import { makeId } from '../storage/ids.js';
 
@@ -114,6 +114,8 @@ export function openWorkshop({ files, existing = null, onSave }) {
     index = i;
     showError('');
     setBusy(true);
+    unloadImage(image);
+    image = null;
     try {
       image = await loadImage(files[i]);
     } catch (err) {
@@ -137,7 +139,8 @@ export function openWorkshop({ files, existing = null, onSave }) {
       title.textContent = (existing ? 'Edit card' : 'New card') + counter;
       secondary.textContent = 'Cancel';
       primary.textContent = 'Next: card back';
-      requestAnimationFrame(drawCrop);
+      drawCrop(); // place the photo right away (no flash of an unplaced photo)…
+      requestAnimationFrame(drawCrop); // …and again once the layout has settled
     } else {
       title.textContent = 'Card back' + counter;
       secondary.textContent = 'Back';
@@ -170,18 +173,24 @@ export function openWorkshop({ files, existing = null, onSave }) {
     zoomInput.value = crop.zoom;
   }
 
+  let previewToken = 0;
+
   async function drawBackStep() {
-    // A preview of the front, drawn the same way it will be saved
-    const blob = await renderCardFront(image, crop);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = URL.createObjectURL(blob);
-    frontPreview.src = previewUrl;
     const colorInput = dialog.querySelector(`input[name="back-color"][value="${back.color}"]`);
     if (colorInput) colorInput.checked = true;
     const patternInput = dialog.querySelector(`input[name="back-pattern"][value="${back.pattern}"]`);
     if (patternInput) patternInput.checked = true;
     textInput.value = back.text ?? '';
     drawBack();
+
+    // A preview of the front, drawn the same way it will be saved
+    const token = ++previewToken;
+    frontPreview.removeAttribute('src');
+    const blob = await renderCardFront(image, crop);
+    if (token !== previewToken) return; // a newer preview has started
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(blob);
+    frontPreview.src = previewUrl;
   }
 
   function drawBack() {
@@ -219,6 +228,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
 
   function close() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
+    unloadImage(image);
     removeEventListener('resize', drawCrop);
     dialog.close();
     dialog.remove();
@@ -269,7 +279,7 @@ export function openWorkshop({ files, existing = null, onSave }) {
 
   cropArea.addEventListener('pointerdown', (event) => {
     if (!image) return;
-    cropArea.setPointerCapture?.(event.pointerId);
+    try { cropArea.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   });
 

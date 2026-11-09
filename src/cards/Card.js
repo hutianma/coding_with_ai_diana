@@ -23,7 +23,6 @@ export function createCard(card) {
   img.src = imageUrl(card.front);
   img.alt = card.back?.text ? `Photocard: ${card.back.text}` : 'Photocard';
   img.draggable = false;
-  img.decoding = 'async';
   el.append(img);
   return el;
 }

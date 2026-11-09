@@ -5,21 +5,23 @@ export const CARD_HEIGHT = 928; // saved card size: 600 × 928 (55:85)
 export const CARD_WIDTH = Math.round(CARD_HEIGHT * CARD_RATIO);
 const SOURCE_MAX = 1600; // keep a smaller copy of the original so the card can be re-cropped later
 
-// Load a photo file or Blob into an <img> (browsers turn iPhone photos the right way up)
+// Load a photo file or Blob into an <img> (browsers turn iPhone photos the right way up).
+// The <img> can be shown on screen; call unloadImage(img) when it's no longer needed.
 export function loadImage(blob) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
+    img.onload = () => resolve(img);
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error("This photo couldn't be opened. Try a JPEG or PNG."));
     };
     img.src = url;
   });
+}
+
+export function unloadImage(img) {
+  if (img?.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
 }
 
 function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.88) {
