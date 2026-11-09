@@ -68,3 +68,70 @@
   text-transform: uppercase;
   opacity: 0.85;
 }
+
+.card--photo {
+  background: var(--pocket-bg);
+}
+
+.card__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ---------- Card backs ---------- */
+
+.card-back {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+  container-type: inline-size;
+  color: #4a2a3a;
+  background-color: var(--back-color);
+}
+
+.card-back--dark { color: #f6eef2; }
+
+.card-back--dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.55) 18%, transparent 20%);
+  background-size: 14cqi 14cqi;
+}
+
+.card-back--stripes {
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.45) 0 6cqi, transparent 6cqi 12cqi);
+}
+
+.card-back--checks {
+  background-image: conic-gradient(rgba(255, 255, 255, 0.45) 25%, transparent 0 50%, rgba(255, 255, 255, 0.45) 0 75%, transparent 0);
+  background-size: 20cqi 20cqi;
+}
+
+.card-back--grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.6) 1px, transparent 1px);
+  background-size: 10cqi 10cqi;
+}
+
+.card-back__text {
+  max-width: 80%;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-size: 9cqi;
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.card-back--dark .card-back__text { background: rgba(0, 0, 0, 0.3); }
+.card-back__text:empty { display: none; }

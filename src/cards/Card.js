@@ -1,5 +1,6 @@
-// Draws one photocard. For now only placeholder cards exist;
-// real photos arrive in M4.
+import { imageUrl } from './imageUrls.js';
+
+// Draws the front of one photocard: a placeholder (demo binder) or your photo.
 export function createCard(card) {
   const el = document.createElement('div');
   el.className = 'card';
@@ -13,7 +14,16 @@ export function createCard(card) {
     `;
     el.setAttribute('role', 'img');
     el.setAttribute('aria-label', `Placeholder card ${card.number}`);
+    return el;
   }
 
+  el.classList.add('card--photo');
+  const img = document.createElement('img');
+  img.className = 'card__photo';
+  img.src = imageUrl(card.front);
+  img.alt = card.back?.text ? `Photocard: ${card.back.text}` : 'Photocard';
+  img.draggable = false;
+  img.decoding = 'async';
+  el.append(img);
   return el;
 }
