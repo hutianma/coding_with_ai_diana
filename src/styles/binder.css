@@ -189,6 +189,16 @@
   width: calc(2 * var(--page-w) + var(--spine-w));
   height: calc(var(--page-w) * var(--page-ratio));
   perspective: 3400px;
+  /* Sideways drags turn pages; up/down scrolling and pinch-zoom still work */
+  touch-action: pan-y pinch-zoom;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.book.is-dragging {
+  cursor: grabbing;
 }
 
 .book--single {

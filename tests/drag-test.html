@@ -1,0 +1,169 @@
+<!--
+  Automated drag-to-flip tests (M3).
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/drag-test.html  → every line should say PASS.
+  Fake finger drags are sent to the binder; the animation clock is faked so
+  flips finish instantly and predictably.
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Drag-to-flip tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script>
+const out = document.getElementById('out');
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+const results = [];
+let win, doc, book;
+
+function load(w, h, q) {
+  f.style.width = w + 'px'; f.style.height = h + 'px';
+  return new Promise(r => { f.onload = r; f.src = '/index.html?' + q; }).then(async () => {
+    await wait(100);
+    win = f.contentWindow; doc = win.document;
+    let now = 0;
+    win.performance.now = () => now;
+    win.requestAnimationFrame = (cb) => setTimeout(() => { now += 50; cb(now); }, 1);
+    win.cancelAnimationFrame = () => {};
+    book = doc.querySelector('.book');
+  });
+}
+
+function pointer(type, x, y) {
+  const target = type === 'pointerdown' ? doc.elementFromPoint(x, y) : book;
+  target.dispatchEvent(new win.PointerEvent(type, {
+    bubbles: true, cancelable: true, pointerId: 7, isPrimary: true,
+    pointerType: 'touch', button: 0, clientX: x, clientY: y,
+  }));
+}
+
+// Drag from (x, y) by dx/dy in `steps` moves, `gap` ms apart. Optionally stop before releasing.
+async function drag(x, y, dx, dy, { steps = 8, gap = 30, release = true } = {}) {
+  pointer('pointerdown', x, y);
+  for (let i = 1; i <= steps; i++) {
+    await wait(gap);
+    pointer('pointermove', x + (dx * i) / steps, y + (dy * i) / steps);
+  }
+  if (release) {
+    await wait(gap * 5); // hold still, so it isn't a flick
+    pointer('pointerup', x + dx, y + dy);
+    await wait(600);
+  }
+}
+
+async function flick(x, y, dx) {
+  pointer('pointerdown', x, y);
+  for (let i = 1; i <= 4; i++) { await wait(4); pointer('pointermove', x + (dx * i) / 4, y); }
+  pointer('pointerup', x + dx, y);
+  await wait(600);
+}
+
+const label = () => doc.querySelector('.page-nav__label').textContent;
+const rect = () => book.getBoundingClientRect();
+function angleOf(leafIndex) {
+  const m = doc.querySelectorAll('.leaf')[leafIndex].style.transform.match(/-?[\d.]+/);
+  return m ? Number(m[0]) : NaN;
+}
+function check(name, ok, extra = '') {
+  results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+}
+
+(async () => {
+  try {
+    // ---------- Phone ----------
+    await load(390, 844, 'open');
+    let r = rect(), cx = r.left + r.width * 0.75, cy = r.top + r.height / 2, w = r.width;
+
+    await drag(cx, cy, -w * 0.5, 0, { release: false });
+    check('phone: page follows the finger mid-drag', angleOf(0) < -60 && angleOf(0) > -120, 'angle ' + angleOf(0));
+    check('phone: page counter waits until release', label() === 'Page 1 of 4', label());
+    await wait(150); pointer('pointerup', cx - w * 0.5, cy); await wait(600);
+
+    await load(390, 844, 'open');
+    await drag(cx, cy, -w * 0.7, 0);
+    check('phone: drag left past halfway → next page', label() === 'Page 2 of 4', label());
+
+    await load(390, 844, 'open');
+    await drag(cx, cy, -w * 0.3, 0);
+    check('phone: short drag springs back', label() === 'Page 1 of 4' && angleOf(0) === 0, label() + ' angle ' + angleOf(0));
+
+    await load(390, 844, 'open');
+    await flick(cx, cy, -w * 0.2);
+    check('phone: quick flick → next page', label() === 'Page 2 of 4', label());
+
+    await load(390, 844, 'page=2');
+    await drag(r.left + w * 0.3, cy, w * 0.7, 0);
+    check('phone: drag right → previous page', label() === 'Page 1 of 4', label());
+
+    await load(390, 844, 'open');
+    await drag(r.left + w * 0.3, cy, w * 0.7, 0);
+    check('phone: drag right on first page does nothing', label() === 'Page 1 of 4' && angleOf(0) === 0, label());
+
+    await load(390, 844, 'open');
+    await drag(cx, cy, -10, -200);
+    check('phone: up/down drag does not turn', label() === 'Page 1 of 4' && angleOf(0) === 0, label());
+
+    await load(390, 844, 'open');
+    let clicks = 0;
+    book.addEventListener('click', () => clicks++);
+    pointer('pointerdown', cx, cy); pointer('pointerup', cx, cy);
+    doc.elementFromPoint(cx, cy).click();
+    check('phone: a tap is still a tap', clicks === 1 && label() === 'Page 1 of 4', 'clicks ' + clicks);
+
+    clicks = 0;
+    await drag(cx, cy, -w * 0.3, 0, { release: false });
+    await wait(150); pointer('pointerup', cx - w * 0.3, cy);
+    doc.elementFromPoint(cx, cy).click(); // the click a browser fires after a drag
+    await wait(600);
+    check('phone: click after a drag is swallowed', clicks === 0, 'clicks ' + clicks);
+
+    await load(390, 844, 'open');
+    await drag(cx, cy, -w * 0.7, 0);
+    doc.querySelector('[data-dir=next]').click(); await wait(600);
+    check('phone: arrows still work after dragging', label() === 'Page 3 of 4', label());
+
+    await load(390, 844, 'open');
+    pointer('pointerdown', cx, cy);
+    for (let i = 1; i <= 4; i++) { await wait(4); pointer('pointermove', cx - (w * 0.3 * i) / 4, cy); }
+    await wait(400); // fast, then hold still before letting go
+    pointer('pointerup', cx - w * 0.3, cy); await wait(600);
+    check('phone: fast drag, then hold still → springs back (not a flick)', label() === 'Page 1 of 4', label());
+
+    await load(390, 844, 'open');
+    pointer('pointerdown', cx, cy); // release never arrives (e.g. let go outside the window)
+    await drag(cx, cy, -w * 0.7, 0);
+    check('phone: a lost release doesn\'t block the next drag', label() === 'Page 2 of 4', label());
+
+    clicks = 0;
+    book.addEventListener('click', () => clicks++);
+    await drag(cx, cy, -w * 0.3, 0);
+    await wait(700);
+    doc.elementFromPoint(cx, cy).click(); // a real tap, well after the drag
+    check('phone: a later tap is not swallowed', clicks === 1, 'clicks ' + clicks);
+
+    // ---------- Computer ----------
+    await load(1280, 800, 'open');
+    r = rect(); cy = r.top + r.height / 2;
+    const page = r.width / 2;
+    await drag(r.left + r.width * 0.85, cy, -page, 0);
+    check('computer: drag right page leftwards → next spread', label() === 'Pages 2–3 of 4', label());
+
+    await drag(r.left + r.width * 0.15, cy, page, 0);
+    check('computer: drag left page rightwards → previous spread', label() === 'Page 1 of 4', label());
+
+    await drag(r.left + r.width * 0.15, cy, page, 0);
+    check('computer: dragging the empty left side on page 1 does nothing', label() === 'Page 1 of 4', label());
+
+    clicks = 0;
+    book.addEventListener('click', () => clicks++);
+    const rx = r.left + r.width * 0.85;
+    await drag(rx, cy, 40, 0); // right page dragged the wrong way
+    doc.elementFromPoint(rx + 40, cy).click();
+    check('computer: dragging the right page rightwards is not a turn (click kept)',
+      label() === 'Page 1 of 4' && clicks === 1, label() + ' clicks ' + clicks);
+  } catch (e) {
+    results.push('ERROR ' + e.stack);
+  }
+  out.textContent = results.join('\n');
+  out.dataset.done = 1;
+})();
+</script>
