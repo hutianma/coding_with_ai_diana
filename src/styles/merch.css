@@ -1,0 +1,80 @@
+/* ---------- Badge (吧唧) ---------- */
+
+.badge {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  container-type: inline-size;
+  background: var(--pocket-bg);
+  box-shadow: 0 4px 10px rgba(40, 10, 30, 0.25);
+}
+
+.badge__photo,
+.badge__fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.badge__photo { object-fit: cover; }
+
+/* The domed plastic on top: a highlight, darker edges, and the colored rim */
+.badge__dome {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 45% 35% at 34% 26%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.12) 55%, transparent 70%),
+    radial-gradient(circle at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.2) 100%);
+  box-shadow:
+    inset 0 0 0 4.5cqi var(--rim),
+    inset 0 0 0 calc(4.5cqi + 1px) rgba(0, 0, 0, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+/* The back: a metal plate with a pin */
+.badge-back {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  container-type: inline-size;
+  background:
+    radial-gradient(circle at 35% 30%, #fbfbfd, #c9ccd3 55%, #9aa0aa 100%);
+}
+
+/* The rim is drawn by a child, so 4.5cqi means 4.5% of this badge (not the screen) */
+.badge-back::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4.5cqi var(--rim), inset 0 0 0 calc(4.5cqi + 1px) rgba(0, 0, 0, 0.2);
+}
+
+.badge-back__pin {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 46%;
+  height: 4cqi;
+  border-radius: 2cqi;
+  background: linear-gradient(#f2f3f5, #8d929b);
+  box-shadow: 0 1cqi 2cqi rgba(0, 0, 0, 0.3);
+}
+
+.badge-back__pin::after {
+  content: "";
+  position: absolute;
+  right: -3cqi;
+  top: -2cqi;
+  width: 8cqi;
+  height: 8cqi;
+  border-radius: 50%;
+  border: 1.6cqi solid #a7acb5;
+}
