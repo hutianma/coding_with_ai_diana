@@ -190,10 +190,15 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
   // The shine follows how the phone turns. The resting position slowly follows how you
   // hold it, so the shine returns to the middle when you keep still — lying flat, upright,
   // or in between — and only moves while you're turning the phone.
-  const RECENTER = 0.02; // per reading (about 60 a second): back to the middle in ~2 s
+  const RECENTER_SECONDS = 0.8; // how quickly the resting position catches up (about 2 s to settle)
+  // How far to move towards the new position, for a reading `ms` after the last one
+  // (by time, so phones that send readings faster or slower feel the same)
+  const recenterRate = (ms) => 1 - Math.exp(-Math.min(Math.max(ms, 1), 200) / 1000 / RECENTER_SECONDS);
   let tiltBase = null; // resting direction of gravity (from the motion sensor)
+  let tiltNow = null; // current direction of gravity, smoothed
   let tiltFromMotion = false;
   let baseOrientation = null; // resting tilt angles (only if there's no motion sensor)
+  let lastOrientationAt = 0;
   function onOrientation(event) {
     if (event.beta == null || event.gamma == null) return;
     // No motion sensor readings (some browsers): estimate "down" from the tilt angles
@@ -201,10 +206,12 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
       const rad = Math.PI / 180;
       sendGravity(clamp(Math.sin(event.gamma * rad)), clamp(Math.sin(event.beta * rad)));
     }
-    if (tiltFromMotion) return; // the motion sensor gives a steadier tilt
+    if (tiltFromMotion || usingMouse) return; // the motion sensor gives a steadier tilt
+    const rate = recenterRate(event.timeStamp - lastOrientationAt);
+    lastOrientationAt = event.timeStamp;
     baseOrientation ??= { beta: event.beta, gamma: event.gamma };
-    baseOrientation.beta += (event.beta - baseOrientation.beta) * RECENTER;
-    baseOrientation.gamma += (event.gamma - baseOrientation.gamma) * RECENTER;
+    baseOrientation.beta += (event.beta - baseOrientation.beta) * rate;
+    baseOrientation.gamma += (event.gamma - baseOrientation.gamma) * rate;
     target = {
       x: clamp((event.gamma - baseOrientation.gamma) / 25),
       y: clamp((event.beta - baseOrientation.beta) / 25),
@@ -212,11 +219,21 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     startLoop();
   }
 
-  function tiltFromGravity(aig) {
-    const now = deviceGravity(aig);
-    if (!now) return;
+  let lastMotionAt = 0;
+  function tiltFromGravity(event) {
+    if (usingMouse) return; // a mouse is steering the shine
+    const reading = deviceGravity(event.accelerationIncludingGravity);
+    if (!reading) return;
+    // While the phone is being shaken, the reading isn't just gravity: don't let the
+    // shine (or its resting position) jump around
+    const a = event.acceleration;
+    if (a?.x != null && Math.hypot(a.x, a.y, a.z ?? 0) > 2) return;
     tiltFromMotion = true;
-    tiltBase = tiltBase ? recenter(tiltBase, now, RECENTER) : now;
+    const rate = recenterRate(event.timeStamp - lastMotionAt);
+    lastMotionAt = event.timeStamp;
+    tiltNow = tiltNow ? recenter(tiltNow, reading, 0.35) : reading; // smooth out sensor noise
+    const now = tiltNow;
+    tiltBase = tiltBase ? recenter(tiltBase, now, rate) : now;
     const t = tiltBetween(tiltBase, now);
     target = { x: clamp(t.x * 3), y: clamp(t.y * 3) };
     startLoop();
@@ -236,7 +253,7 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     onGravity(x, y);
   }
   function onMotion(event) {
-    tiltFromGravity(event.accelerationIncludingGravity);
+    tiltFromGravity(event);
     const g = screenGravity(event.accelerationIncludingGravity);
     if (g) {
       motionGravity = true;
