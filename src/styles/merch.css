@@ -124,3 +124,183 @@
   color: rgba(40, 30, 40, 0.45);
   font-family: ui-monospace, Menlo, monospace;
 }
+
+/* ---------- Badge & polaroid workshop ---------- */
+
+.merch-workshop__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.crop__frame--round {
+  width: min(64vw, 280px, 100svh - 360px);
+  aspect-ratio: 1;
+}
+
+.crop__frame--round::after { border-radius: 50%; }
+
+.badge-preview {
+  width: min(56vw, 230px);
+}
+
+.badge-preview__shake[hidden] { display: none; }
+
+/* Layout choices, each with a little drawing of the print */
+.layouts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.layouts legend {
+  width: 100%;
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.layout-choice {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  font-size: 0.8rem;
+  text-align: center;
+  background: var(--chip-bg);
+  cursor: pointer;
+}
+
+.layout-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.layout-choice:has(input:checked) { box-shadow: 0 0 0 2px var(--accent); }
+.layout-choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.layout-choice small { color: var(--accent); font-weight: 600; }
+
+.layout-choice__pic {
+  height: 72px;
+  background: #fbfaf7;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(40, 10, 30, 0.2);
+  position: relative;
+}
+
+.layout-choice__pic::before {
+  content: "";
+  position: absolute;
+  background: #9b8fb8;
+}
+
+.layout-choice__pic--single,
+.layout-choice__pic--stack { aspect-ratio: 54 / 86; }
+.layout-choice__pic--side { aspect-ratio: 108 / 86; }
+
+.layout-choice__pic--single::before,
+.layout-choice__pic--stack::before { left: 7.4%; top: 8.1%; width: 85.2%; height: 72.1%; }
+.layout-choice__pic--side::before { left: 4.2%; top: 8.1%; width: 91.6%; height: 72.1%; }
+
+.layout-choice__pic--side::after,
+.layout-choice__pic--stack::after {
+  content: "";
+  position: absolute;
+  background: #fbfaf7;
+}
+
+.layout-choice__pic--side::after { left: calc(50% - 1px); top: 8.1%; width: 2px; height: 72.1%; }
+.layout-choice__pic--stack::after { left: 7.4%; top: calc(44.15% - 1px); width: 85.2%; height: 2px; }
+
+/* The print being edited: one cell per photo */
+.polaroid-edit,
+.polaroid-caption {
+  position: relative;
+  width: min(100%, 300px, (100svh - 330px) * var(--ratio));
+  aspect-ratio: var(--ratio);
+  border-radius: 2px;
+  background: var(--frame);
+  box-shadow: 0 6px 16px rgba(40, 10, 30, 0.2);
+}
+
+.polaroid-edit:has(.polaroid-edit__cell:nth-child(2)) { width: min(100%, 420px, (100svh - 360px) * var(--ratio)); }
+
+.polaroid-edit__photo,
+.polaroid-caption__photo,
+.polaroid-caption__pad {
+  position: absolute;
+}
+
+.polaroid-edit__photo { background: #1d1a22; }
+
+.polaroid-edit__cell {
+  position: absolute;
+  overflow: hidden;
+  cursor: grab;
+  outline: 1px solid rgba(255, 255, 255, 0.35);
+  outline-offset: -1px;
+}
+
+.polaroid-edit__cell .crop__img[hidden] { display: none; }
+
+.polaroid-edit__add {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+/* Once there's a photo, "Change" moves to a corner so it doesn't cover the face */
+.polaroid-edit__cell.has-photo .polaroid-edit__add {
+  left: auto;
+  top: auto;
+  right: 6px;
+  bottom: 6px;
+  transform: none;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  background: rgba(30, 20, 30, 0.6);
+}
+
+.polaroid-edit__zooms {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  width: 100%;
+}
+
+.polaroid-edit__zooms .workshop__zoom[hidden] { display: none; }
+
+.polaroid-caption__pad {
+  cursor: crosshair;
+  touch-action: none;
+  background: repeating-linear-gradient(0deg, transparent 0 22%, rgba(120, 100, 140, 0.12) 22% 23%);
+}
+
+.caption__clear {
+  border: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+}

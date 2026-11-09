@@ -10,9 +10,10 @@ export const PEN_COLORS = [
 
 const LINE_WIDTH = 9; // in card pixels (the card is 600 px wide)
 
-export function createSignaturePad(canvas) {
+// colors: the pens to choose from. lineWidth: in canvas pixels.
+export function createSignaturePad(canvas, { colors = PEN_COLORS, lineWidth = LINE_WIDTH } = {}) {
   const ctx = canvas.getContext('2d');
-  let color = PEN_COLORS[0].value;
+  let color = colors[0].value;
   let hasInk = false;
   let changed = false; // drawn on or cleared since reset()
   let last = null; // previous point of the stroke being drawn
@@ -31,7 +32,7 @@ export function createSignaturePad(canvas) {
 
   function stroke() {
     ctx.strokeStyle = color;
-    ctx.lineWidth = LINE_WIDTH;
+    ctx.lineWidth = lineWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     // A soft shadow makes the ink readable on light and dark photos
@@ -47,7 +48,7 @@ export function createSignaturePad(canvas) {
     // A dot, so a single tap leaves a mark
     stroke();
     ctx.beginPath();
-    ctx.arc(last.x, last.y, LINE_WIDTH / 2, 0, Math.PI * 2);
+    ctx.arc(last.x, last.y, lineWidth / 2, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
     hasInk = changed = true;
@@ -77,7 +78,7 @@ export function createSignaturePad(canvas) {
     get changed() { return changed; },
 
     setColor(value) {
-      if (PEN_COLORS.some((c) => c.value === value)) color = value;
+      if (colors.some((c) => c.value === value)) color = value;
     },
 
     clear() {
