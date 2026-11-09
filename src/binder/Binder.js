@@ -1,13 +1,16 @@
 import { createPage, createBlankPage } from './Sleeve.js';
 import { PageFlip } from './PageFlip.js';
 import { createPaging, pageLabel, clamp } from './paging.js';
+import { emptySlots } from './layout.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
 // Shows the binder as one book. It starts closed on its cover; open it by
 // tapping or dragging the cover, or with the arrows / ← → keys.
 // startPage: 0 = closed on the cover, 1+ = open at that page.
-export function mountBinder(root, binder, { startPage = 0 } = {}) {
+// toolbarEnd / notice: optional elements shown at the right of the toolbar / under it.
+// fadeIn: fade the binder in (off when redrawing after a change).
+export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true } = {}) {
   // A binder always has at least one (empty) page, so it can be opened
   const pages = binder.pages.length ? binder.pages : [emptyPage(binder.layout)];
 
@@ -15,7 +18,7 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
   let focusPage = clamp(Math.floor(startPage) || 0, 0, pages.length);
 
   const view = document.createElement('div');
-  view.className = 'binder-view';
+  view.className = fadeIn ? 'binder-view' : 'binder-view binder-view--still';
 
   const toolbar = document.createElement('header');
   toolbar.className = 'toolbar';
@@ -27,6 +30,7 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
   // textContent (not innerHTML) so names are always shown as plain text
   toolbar.querySelector('.toolbar__title').textContent = binder.name;
   const backBtn = toolbar.querySelector('.toolbar__back');
+  if (toolbarEnd) toolbar.lastElementChild.replaceWith(toolbarEnd);
 
   const stage = document.createElement('div');
   stage.className = 'stage';
@@ -133,18 +137,35 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
     // Leave shortcuts like Cmd+← (browser Back) and keys used elsewhere alone
     if (event.defaultPrevented || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
     if (event.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    if (document.querySelector('dialog[open]')) return; // a window is open on top of the binder
     if (event.key === 'ArrowRight') flip.next();
     if (event.key === 'ArrowLeft') flip.prev();
   }
   document.addEventListener('keydown', onKey);
   phoneQuery.addEventListener('change', buildBook);
 
-  view.append(toolbar, stage, nav);
+  view.append(toolbar);
+  let noticeObserver = null;
+  if (notice) {
+    view.append(notice);
+    // The pages shrink to make room for the notice, however many lines it wraps to
+    noticeObserver = new ResizeObserver(measureNotice);
+    noticeObserver.observe(notice);
+  }
+  view.append(stage, nav);
+
+  function measureNotice() {
+    view.style.setProperty('--notice-h', `${notice.offsetHeight + 12}px`);
+  }
   root.replaceChildren(view);
+  if (notice) measureNotice(); // right away, so the first drawing is already the right size
   buildBook();
 
   return {
+    // The page being looked at (0 = cover)
+    get page() { return focusPage; },
     destroy() {
+      noticeObserver?.disconnect();
       document.removeEventListener('keydown', onKey);
       phoneQuery.removeEventListener('change', buildBook);
       flip?.destroy();
@@ -154,7 +175,7 @@ export function mountBinder(root, binder, { startPage = 0 } = {}) {
 }
 
 function emptyPage(layout) {
-  return { id: 'empty', slots: Array(layout === '3x3' ? 9 : 4).fill(null) };
+  return { id: 'empty', slots: emptySlots(layout) };
 }
 
 // The inside of the front cover (seen on the left once the binder is open)

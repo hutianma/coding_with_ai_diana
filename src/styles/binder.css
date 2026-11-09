@@ -1,29 +1,36 @@
 /* ---------- Sizes ----------
    A 2×2 page is about 1.45× taller than it is wide.
-   --page-w is the largest page width that fits the screen. */
+   --page-w is the largest page width that fits the screen. It's worked out on
+   .binder-view so that a notice above the binder (--notice-h, measured in Binder.js)
+   shrinks the pages. */
 
 :root {
   --spine-w: 34px;
   --page-ratio: 1.45;
   --chrome-h: calc(150px + var(--safe-top) + var(--safe-bottom)); /* toolbar + page arrows + spacing */
+  --notice-h: 0px;
   --screen-h: 100vh;
-  --page-w: min(
-    (100vw - 32px - var(--safe-left) - var(--safe-right) - var(--spine-w)) / 2,
-    (var(--screen-h) - var(--chrome-h)) / var(--page-ratio)
-  );
 }
 
 @supports (height: 100svh) {
   :root { --screen-h: 100svh; } /* svh = the visible height on iPhone, without the address bar */
 }
 
+.binder-view {
+  --page-w: min(
+    (100vw - 32px - var(--safe-left) - var(--safe-right) - var(--spine-w)) / 2,
+    (var(--screen-h) - var(--chrome-h) - var(--notice-h)) / var(--page-ratio)
+  );
+}
+
 /* Phones: one page at a time */
 @media (max-width: 700px) {
-  :root {
-    --spine-w: 26px;
+  :root { --spine-w: 26px; }
+
+  .binder-view {
     --page-w: min(
       100vw - 32px - var(--safe-left) - var(--safe-right) - var(--spine-w),
-      (var(--screen-h) - var(--chrome-h)) / var(--page-ratio)
+      (var(--screen-h) - var(--chrome-h) - var(--notice-h)) / var(--page-ratio)
     );
   }
 }
@@ -101,6 +108,8 @@
   gap: 12px;
   animation: fade-in 0.35s ease;
 }
+
+.binder-view--still { animation: none; }
 
 @keyframes fade-in {
   from { opacity: 0; transform: scale(0.98); }
@@ -402,7 +411,7 @@
 
 @media (max-width: 700px) {
   .toolbar__title { display: none; }
-  .toolbar { grid-template-columns: 1fr 1fr; }
+  .toolbar { grid-template-columns: auto 1fr; }
 }
 
 /* ---------- Reduce Motion ---------- */

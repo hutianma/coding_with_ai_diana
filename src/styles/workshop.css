@@ -1,0 +1,387 @@
+/* ---------- Workshop & My cards (full-screen sheets) ---------- */
+
+.workshop,
+.my-cards {
+  width: min(100vw, 520px);
+  max-width: 100vw;
+  max-height: 100%;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  color: var(--ink);
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(40, 10, 30, 0.35);
+}
+
+.workshop[open],
+.my-cards[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.workshop::backdrop,
+.my-cards::backdrop {
+  background: rgba(30, 15, 25, 0.45);
+}
+
+/* Phones: the sheet fills the screen */
+@media (max-width: 700px) {
+  .workshop,
+  .my-cards {
+    width: 100vw;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  }
+}
+
+.workshop__header,
+.my-cards__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 6px;
+}
+
+.workshop__title,
+.my-cards__title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.workshop__close,
+.my-cards__close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--chip-bg);
+  cursor: pointer;
+}
+
+.workshop__step {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  overflow-y: auto;
+}
+
+.workshop__step[hidden] { display: none; }
+
+/* ---------- Crop ---------- */
+
+.crop {
+  position: relative;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 18px 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #1e1620;
+  touch-action: none;
+  cursor: grab;
+}
+
+.crop:active { cursor: grabbing; }
+
+.crop__frame {
+  position: relative;
+  width: min(62vw, 260px, (100svh - 330px) * 55 / 85);
+  aspect-ratio: 55 / 85;
+}
+
+.crop__img {
+  position: absolute;
+  max-width: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}
+
+/* Dim everything outside the card frame, and show the frame's edge */
+.crop__frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 0 999px rgba(20, 10, 18, 0.6);
+  pointer-events: none;
+}
+
+.workshop__zoom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 320px);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.workshop__zoom input { flex: 1; accent-color: var(--accent); }
+
+.workshop__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ---------- Card back ---------- */
+
+.back-preview {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+
+.back-preview__front,
+.back-preview__back {
+  width: min(34vw, 150px);
+  aspect-ratio: 55 / 85;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 6px 16px rgba(40, 10, 30, 0.2);
+}
+
+.back-preview__front img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.swatches,
+.patterns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.swatches legend,
+.patterns legend {
+  width: 100%;
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+
+.swatch input,
+.pattern input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch:has(input:checked) {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent);
+}
+
+.swatch:has(input:focus-visible),
+.pattern:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.pattern {
+  position: relative;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: var(--chip-bg);
+  cursor: pointer;
+}
+
+.pattern:has(input:checked) {
+  color: #fff;
+  background: var(--accent);
+}
+
+.workshop__text {
+  display: grid;
+  gap: 6px;
+  width: min(100%, 320px);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.workshop__text input {
+  padding: 10px 12px;
+  border: 1px solid var(--pocket-edge);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 1rem; /* 16px stops iPhone Safari from zooming in */
+  color: var(--ink);
+  background: var(--page-bg);
+}
+
+/* ---------- Footer ---------- */
+
+.workshop__error {
+  margin: 0 16px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: #8a1c3c;
+  background: #fde2ea;
+}
+
+.workshop__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 16px;
+}
+
+.workshop__primary,
+.workshop__secondary,
+.toolbar__action {
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workshop__primary,
+.toolbar__action--primary {
+  color: #fff;
+  background: var(--accent);
+}
+
+.workshop__secondary,
+.toolbar__action {
+  color: var(--ink);
+  background: var(--chip-bg);
+}
+
+.workshop__primary:disabled,
+.workshop__secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.workshop.is-busy .workshop__primary::after {
+  content: "…";
+}
+
+/* ---------- Toolbar actions & notice ---------- */
+
+.toolbar__actions {
+  justify-self: end;
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar__action {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.notice {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--muted);
+  background: var(--chip-bg);
+}
+
+.notice--warning {
+  border-radius: 14px;
+  color: #8a1c3c;
+  background: #fde2ea;
+}
+
+/* ---------- My cards ---------- */
+
+.my-cards__list {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  align-content: start;
+  gap: 14px;
+  margin: 0;
+  padding: 8px 16px 16px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.my-cards__item {
+  display: grid;
+  gap: 6px;
+}
+
+.my-cards__thumb {
+  aspect-ratio: 55 / 85;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(40, 10, 30, 0.15);
+}
+
+.my-cards__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-cards__buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.my-cards__buttons button {
+  flex: 1;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: var(--chip-bg);
+  cursor: pointer;
+}
+
+.my-cards__empty {
+  margin: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
