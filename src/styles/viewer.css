@@ -229,3 +229,6 @@
 
   .viewer__holo { opacity: 0.3; }
 }
+
+.viewer--shape-badge .viewer__card:focus-visible { border-radius: 50%; }
+.viewer--shape-polaroid .viewer__card:focus-visible { border-radius: 6px; }
