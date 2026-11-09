@@ -69,6 +69,21 @@ export async function saveCard(binder, card) {
   return pageNumber;
 }
 
+// ---------- Badges and polaroids ----------
+
+export async function loadMerch() {
+  const list = await getAll('merch');
+  return Object.fromEntries(list.map((item) => [item.id, item]));
+}
+
+export function saveMerch(item) {
+  return writeMany([{ store: 'merch', value: item }]);
+}
+
+export function deleteMerch(id) {
+  return writeMany([{ store: 'merch', deleteId: id }]);
+}
+
 // Delete a card and empty its pocket
 export async function deleteCard(binder, cardId) {
   const pages = copyPages(binder).map((page) => ({

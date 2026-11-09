@@ -47,6 +47,40 @@
   transform-origin: center;
 }
 
+/* Badges are round */
+.viewer--shape-badge .viewer__lift {
+  width: min(78vw, 360px, 100svh - 220px);
+  aspect-ratio: 1;
+}
+
+.viewer--shape-badge .viewer__face,
+.viewer--shape-badge .viewer__glare { border-radius: 50%; }
+
+.viewer--shape-badge .viewer__face { box-shadow: 0 24px 50px -12px rgba(20, 5, 15, 0.55); }
+
+.viewer__face > .badge,
+.viewer__face > .badge-back {
+  position: absolute;
+  inset: 0;
+  box-shadow: none;
+}
+
+/* Polaroids: their own size (set by the item: --ratio) */
+.viewer--shape-polaroid .viewer__lift {
+  width: min(80vw, 340px, (100svh - 190px) * var(--ratio, 0.63));
+  aspect-ratio: var(--ratio, 0.63);
+}
+
+.viewer--shape-polaroid .viewer__face { border-radius: 4px; }
+
+.viewer__face > .polaroid,
+.viewer__face > .polaroid-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  box-shadow: none;
+}
+
 .viewer__card {
   position: relative;
   width: 100%;
@@ -107,19 +141,39 @@
 
 .viewer--matte .viewer__glare { opacity: calc(0.1 + var(--tilt) * 0.2); }
 
-/* Holo foil: a rainbow that moves with the tilt (holo cards only) */
+/* Holo foil: the photo stays as it is. A thin rainbow sheen slides across with the
+   tilt, and fine sparkles glint only where the light falls (holo cards only). */
 .viewer__holo {
   position: absolute;
   inset: 0;
   pointer-events: none;
   display: none;
-  background:
-    repeating-linear-gradient(115deg,
-      #ff7ac6 0%, #ffd36e 8%, #8cffb0 16%, #6ed8ff 24%, #b48cff 32%, #ff7ac6 40%);
-  background-size: 300% 300%;
+  background: linear-gradient(115deg,
+    transparent 32%,
+    hsla(320, 100%, 78%, 0.55) 42%,
+    hsla(45, 100%, 75%, 0.5) 47%,
+    hsla(160, 100%, 72%, 0.5) 52%,
+    hsla(205, 100%, 75%, 0.55) 57%,
+    transparent 68%);
+  background-size: 260% 260%;
   background-position: var(--mx) var(--my);
-  mix-blend-mode: color-dodge;
-  opacity: calc(0.25 + var(--tilt) * 0.45);
+  mix-blend-mode: soft-light;
+  opacity: calc(0.2 + var(--tilt) * 0.8);
+}
+
+.viewer__holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle, #fff 0 0.8px, transparent 1.6px) 0 0 / 23px 19px,
+    radial-gradient(circle, #ffe6f7 0 0.7px, transparent 1.4px) 9px 13px / 31px 27px,
+    radial-gradient(circle, #e3f6ff 0 1px, transparent 1.8px) 17px 5px / 41px 37px,
+    radial-gradient(circle, #fff6d6 0 0.6px, transparent 1.2px) 4px 21px / 13px 29px;
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(circle at var(--mx) var(--my), #000, transparent 50%);
+  mask-image: radial-gradient(circle at var(--mx) var(--my), #000, transparent 50%);
+  opacity: calc(0.25 + var(--tilt) * 0.75);
 }
 
 .viewer--holo .viewer__holo { display: block; }
@@ -173,5 +227,8 @@
   .viewer.is-back .viewer__face--back { opacity: 1; }
   .viewer.is-back .viewer__face--front { opacity: 0; }
 
-  .viewer__holo { opacity: 0.35; }
+  .viewer__holo { opacity: 0.3; }
 }
+
+.viewer--shape-badge .viewer__card:focus-visible { border-radius: 50%; }
+.viewer--shape-polaroid .viewer__card:focus-visible { border-radius: 6px; }

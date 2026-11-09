@@ -115,7 +115,7 @@ try {
   f.src = 'about:blank'; await wait(100);
   await new Promise((res) => { const q = indexedDB.deleteDatabase('pocket-fandom'); q.onsuccess = q.onerror = q.onblocked = res; setTimeout(res, 1500); });
   await load('');
-  doc.querySelector('[data-action="new"]').click();
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
   const input = doc.querySelector('input[type=file]');
   const dt = new win.DataTransfer();
   const pic = await testPicture(280);
@@ -169,7 +169,7 @@ try {
   check('saved: no signature, matte finish', edited && !edited.querySelector('.card__signature') && edited.classList.contains('card--matte'), edited?.className);
 
   // ---------- A batch where you don't move the crop keeps each photo ----------
-  doc.querySelector('[data-action="new"]').click();
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
   const input3 = doc.querySelector('input[type=file]');
   const dt3 = new win.DataTransfer();
   for (const hue of [0, 120]) dt3.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));

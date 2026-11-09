@@ -1,0 +1,228 @@
+<!--
+  Automated merch tests (M6): badges with a 流麻 fill, polaroids (including 合拍),
+  the ＋ New menu and the My stuff shelf.
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/merch-test.html  → every line should say PASS.
+  Uses made-up test pictures (colored shapes), never real photos.
+  Note: this deletes the app's saved cards on this browser (localhost only).
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Merch tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script type="module">
+import { createShaker } from '/src/merch/shaker.js';
+import { polaroidSizes, LAYOUTS } from '/src/merch/Polaroid.js';
+
+const out = document.getElementById('out');
+const results = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+let win, doc;
+
+async function until(test, ms = 8000) {
+  for (let t = 0; t < ms; t += 50) { if (test()) return true; await wait(50); }
+  return false;
+}
+
+function testPicture(hue, w = 900, h = 1200) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = `hsl(${hue} 80% 50%)`; g.fillRect(0, 0, w, h);
+  return new Promise((r) => c.toBlob((b) => r(new File([b], 'p.png', { type: 'image/png' })), 'image/png'));
+}
+
+// Answer the next photo picker with a picture
+async function givePhoto(hue) {
+  await until(() => doc.querySelector('input.photo-picker'));
+  const input = doc.querySelector('input.photo-picker');
+  const dt = new win.DataTransfer();
+  dt.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));
+  input.files = dt.files;
+  input.dispatchEvent(new win.Event('change'));
+}
+
+// Which color is in the middle of a box of an image: 'red', 'green' or 'blue'
+async function colorAt(blobOrImg, fx, fy) {
+  const img = blobOrImg instanceof Blob ? await createImageBitmap(blobOrImg) : blobOrImg;
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth || img.width; // the image's real size, not how big it's shown
+  c.height = img.naturalHeight || img.height;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const [r, gr, b] = g.getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data;
+  return r > gr && r > b ? 'red' : gr > b ? 'green' : 'blue';
+}
+
+const primary = () => doc.querySelector('dialog[open] .workshop__primary');
+const title = () => doc.querySelector('dialog[open] .workshop__title')?.textContent;
+
+try {
+  // ---------- 流麻 physics ----------
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 600;
+  const shaker = createShaker(canvas, { fill: 'glitter', seed: 5 });
+  shaker.settle(900);
+  const inside = () => {
+    const d = canvas.getContext('2d').getImageData(0, 0, 600, 600).data;
+    for (let y = 0; y < 600; y += 3) for (let x = 0; x < 600; x += 3) {
+      if (d[(y * 600 + x) * 4 + 3] > 0 && Math.hypot(x - 300, y - 300) > 300 * 0.9 + 2) return false;
+    }
+    return true;
+  };
+  check('流麻 pieces always stay inside the badge', inside());
+  const alpha = (y0, y1) => { const d = canvas.getContext('2d').getImageData(0, y0, 600, y1 - y0).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n; };
+  check('settled pieces sink to the bottom', alpha(330, 600) > alpha(0, 270) * 5, `${alpha(330, 600)} vs ${alpha(0, 270)}`);
+
+  const a = document.createElement('canvas'); a.width = a.height = 600;
+  const b = document.createElement('canvas'); b.width = b.height = 600;
+  createShaker(a, { fill: 'stars', seed: 9 }).settle(170);
+  createShaker(b, { fill: 'stars', seed: 9 }).settle(170);
+  check('the same badge always looks the same when settled', a.toDataURL() === b.toDataURL());
+
+  // ---------- The ＋ New menu ----------
+  await new Promise((res) => { const q = indexedDB.deleteDatabase('pocket-fandom'); q.onsuccess = q.onerror = q.onblocked = res; setTimeout(res, 1500); });
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?open'; });
+  win = f.contentWindow; doc = win.document;
+  await until(() => doc.querySelector('.book'), 20000);
+  doc.querySelector('[data-action="new"]').click(); await wait(100);
+  const options = [...doc.querySelectorAll('.make-menu [data-make]')].map((o) => o.dataset.make).join();
+  check('＋ New offers photocard, badge and polaroid', options === 'card,badge,polaroid', options);
+
+  // ---------- Badge ----------
+  doc.querySelector('[data-make="badge"]').click();
+  await givePhoto(0);
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  check('badge: framed in a circle', !!doc.querySelector('.crop__frame--round') && title() === 'New badge', title());
+  primary().click(); await until(() => doc.querySelector('.badge-preview .badge'));
+  check('badge style: live preview with a Shake button', !!doc.querySelector('.badge-preview .badge__fill') && !doc.querySelector('.badge-preview__shake').hidden);
+  doc.querySelector('input[name="fill"][value="hearts"]').click();
+  doc.querySelector('input[name="rim"][value="#e8c872"]').click();
+  check('badge: rim color shows in the preview', doc.querySelector('.badge-preview .badge').style.getPropertyValue('--rim') === '#e8c872');
+  doc.querySelector('input[name="fill"][value="none"]').click();
+  check('badge: no fill → no pieces, no Shake', !doc.querySelector('.badge-preview .badge__fill') && doc.querySelector('.badge-preview__shake').hidden);
+  doc.querySelector('input[name="fill"][value="hearts"]').click();
+  primary().click();
+  await until(() => doc.querySelector('dialog.my-cards[open]'));
+  check('after saving, My stuff opens on Badges', doc.querySelector('.my-cards__tab[aria-selected="true"]')?.dataset.tab === 'badges'
+    && doc.querySelectorAll('.my-cards__item .badge').length === 1);
+  const savedBadge = doc.querySelector('.my-cards__item .badge');
+  const badgePhoto = savedBadge.querySelector('.badge__photo');
+  await until(() => badgePhoto.complete && badgePhoto.naturalWidth);
+  check('badge photo is saved square (600×600) and red', badgePhoto.naturalWidth === 600 && badgePhoto.naturalHeight === 600 && await colorAt(badgePhoto, 0.5, 0.5) === 'red');
+
+  doc.querySelector('.my-cards__item .my-cards__thumb').click();
+  await until(() => doc.querySelector('dialog.viewer[open]'));
+  const viewer = doc.querySelector('dialog.viewer[open]');
+  const shakeBtn = [...viewer.querySelectorAll('.viewer__btn')].find((x) => x.textContent.includes('Shake'));
+  check('picking up a 流麻 badge: round viewer with Shake', viewer.classList.contains('viewer--shape-badge') && !!shakeBtn);
+  viewer.querySelector('.viewer__close').click();
+  await until(() => !doc.querySelector('dialog.viewer[open]'), 3000);
+
+  // Edit: change the fill to none
+  doc.querySelector('.my-cards__item [data-action="edit"]').click();
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  check('edit badge reopens the workshop', title() === 'Edit badge', title());
+  primary().click(); await until(() => doc.querySelector('.badge-preview .badge'));
+  check('edit remembers the fill', doc.querySelector('input[name="fill"]:checked')?.value === 'hearts');
+  doc.querySelector('input[name="fill"][value="snow"]').click();
+  primary().click();
+  await until(() => doc.querySelector('dialog.my-cards[open]'));
+  const thumbFill = doc.querySelector('.my-cards__item .badge__fill');
+  check('shelf badges use a small fill canvas (saves memory)', thumbFill?.width === 240, thumbFill?.width);
+  check('edited badge: still one badge, now snow', doc.querySelectorAll('.my-cards__item .badge').length === 1
+    && /snow/.test(doc.querySelector('.my-cards__thumb').getAttribute('aria-label')));
+  doc.querySelector('.my-cards__close').click(); await wait(100);
+
+  // ---------- Polaroid 合拍 ----------
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="polaroid"]').click();
+  await until(() => title() === 'New polaroid');
+  doc.querySelector('input[name="layout"][value="side"]').click();
+  doc.querySelector('input[name="frame"][value="#f7d3e1"]').click();
+  primary().click(); await wait(200);
+  check('合拍 side by side: two photo cells', doc.querySelectorAll('.polaroid-edit__cell').length === 2 && title() === 'Photos (合拍)', title());
+  check('can\'t continue until both photos are chosen', primary().disabled);
+  doc.querySelectorAll('.polaroid-edit__add')[0].click(); await givePhoto(0);
+  await until(() => doc.querySelectorAll('.polaroid-edit__cell.has-photo').length === 1);
+  check('still waiting for photo 2', primary().disabled);
+
+  // Switching layout keeps photo 1
+  doc.querySelector('.workshop__secondary').click(); await wait(100);
+  doc.querySelector('input[name="layout"][value="stack"]').click();
+  primary().click(); await wait(300);
+  check('switching to top & bottom keeps photo 1', doc.querySelectorAll('.polaroid-edit__cell.has-photo').length === 1);
+  doc.querySelector('.workshop__secondary').click(); await wait(100);
+  doc.querySelector('input[name="layout"][value="side"]').click();
+  primary().click(); await wait(300);
+
+  doc.querySelectorAll('.polaroid-edit__add')[1].click(); await givePhoto(220);
+  await until(() => doc.querySelectorAll('.polaroid-edit__cell.has-photo').length === 2);
+  check('both photos chosen → Next works', !primary().disabled);
+
+  // "Change" sits on top of the photo: pressing it must not grab the photo
+  const cell1 = doc.querySelectorAll('.polaroid-edit__cell')[0];
+  const change = cell1.querySelector('.polaroid-edit__add');
+  const photoImg = cell1.querySelector('.crop__img');
+  const before = photoImg.style.left + photoImg.style.top;
+  const cr = change.getBoundingClientRect();
+  const cp = (type, d) => change.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 11, isPrimary: true, clientX: cr.left + 5 + d, clientY: cr.top + 5 + d }));
+  cp('pointerdown', 0); cp('pointermove', -40); cp('pointerup', -40);
+  const after = photoImg.style.left + photoImg.style.top;
+  check('pressing Change doesn\'t drag the photo', after === before, `${before} → ${after}`);
+  change.click();
+  check('Change opens the photo picker', !!doc.querySelector('input.photo-picker'));
+  await givePhoto(120);
+  await wait(400);
+  check('after Change the new photo is in that cell', await colorAt(cell1.querySelector('.crop__img'), 0.5, 0.5) === 'green');
+  // put the red photo back so the later checks still apply
+  cell1.querySelector('.polaroid-edit__add').click(); await givePhoto(0); await wait(400);
+  primary().click(); await wait(300);
+  check('then the caption step', title() === 'Caption' && !!doc.querySelector('.polaroid-caption__pad'), title());
+  const pad = doc.querySelector('.polaroid-caption__pad');
+  const pr = pad.getBoundingClientRect();
+  const pe = (t, x) => pad.dispatchEvent(new win.PointerEvent(t, { bubbles: true, pointerId: 3, isPrimary: true, clientX: pr.left + x * pr.width, clientY: pr.top + pr.height / 2 }));
+  doc.querySelector('input[name="pen"][value="#e0508c"]').click(); // pink
+  pe('pointerdown', 0.3); for (let i = 1; i <= 10; i++) pe('pointermove', 0.3 + i * 0.04); pe('pointerup', 0.7);
+  primary().click();
+  await until(() => doc.querySelector('.my-cards__tab[aria-selected="true"]')?.dataset.tab === 'polaroids');
+  const pol = doc.querySelector('.my-cards__item .polaroid');
+  check('saved polaroid is on the shelf with its caption', !!pol?.querySelector('.polaroid__caption') && pol.classList.contains('polaroid--side'));
+  const polPhoto = pol.querySelector('.polaroid__photo');
+  await until(() => polPhoto.complete && polPhoto.naturalWidth);
+  const { photo } = polaroidSizes('side');
+  check(`合拍 photo area is ${photo.width}×${photo.height}`, polPhoto.naturalWidth === photo.width && polPhoto.naturalHeight === photo.height, `${polPhoto.naturalWidth}×${polPhoto.naturalHeight}`);
+  const left = await colorAt(polPhoto, 0.25, 0.5), right = await colorAt(polPhoto, 0.75, 0.5);
+  check('photo 1 on the left, photo 2 on the right', left === 'red' && right === 'blue', `${left} / ${right}`);
+
+  doc.querySelector('.my-cards__item .my-cards__thumb').click();
+  await until(() => doc.querySelector('dialog.viewer[open]'));
+  const ratio = parseFloat(doc.querySelector('dialog.viewer[open]').style.getPropertyValue('--ratio'));
+  check('picking up a wide polaroid keeps its shape', Math.abs(ratio - 108 / 86) < 0.01, ratio);
+  doc.querySelector('dialog.viewer[open] .viewer__close').click();
+  await until(() => !doc.querySelector('dialog.viewer[open]'), 3000);
+
+  // Edit remembers the caption pen
+  doc.querySelector('.my-cards__item [data-action="edit"]').click();
+  await until(() => title() === 'Edit polaroid');
+  primary().click();
+  await until(() => doc.querySelectorAll('.polaroid-edit__cell.has-photo').length === 2);
+  primary().click(); await until(() => title() === 'Caption');
+  check('editing a polaroid remembers the pink pen', doc.querySelector('input[name="pen"]:checked')?.value === '#e0508c');
+  doc.querySelector('dialog[open] .workshop__close').click(); await wait(100);
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  doc.querySelector('.my-cards__tab[data-tab="polaroids"]').click();
+
+  // Delete
+  win.confirm = () => true;
+  doc.querySelector('.my-cards__item [data-action="delete"]').click();
+  await until(() => !doc.querySelector('.my-cards__item .polaroid'));
+  check('deleting the polaroid empties that tab', !!doc.querySelector('.my-cards__empty'));
+  doc.querySelector('.my-cards__tab[data-tab="badges"]').click();
+  check('the badge is still there', doc.querySelectorAll('.my-cards__item .badge').length === 1);
+
+  // Tabs work with the keyboard
+  doc.querySelector('.my-cards__tab[data-tab="badges"]').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  check('→ moves to the next tab', doc.querySelector('.my-cards__tab[aria-selected="true"]').dataset.tab === 'polaroids');
+} catch (e) {
+  results.push('ERROR ' + e.stack);
+}
+out.textContent = results.join('\n');
+out.dataset.done = 1;
+</script>

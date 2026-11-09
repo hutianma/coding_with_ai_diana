@@ -100,11 +100,12 @@ A milestone is finished only when **all** of these are true:
 6. ✅ **Check:** tilting the phone clearly changes the card, and the app stays smooth.
 
 ### M6: More merch
-1. **Badge:** round crop + glossy dome effect.
-2. **Polaroid:** white frame + handwritten caption.
-3. **Acrylic stand:** cut out the subject on the device, put it on a clear base.
-4. A shelf view to see all your merch.
+1. **Holo foil redesign:** keep the photo's colors; sparkles + a thin sheen instead of a rainbow wash.
+2. **Badge (吧唧):** round crop, glossy dome, rim color, optional **流麻** fill (glitter, snow, stars, hearts, sakura) that drifts with the phone's tilt and can be shaken.
+3. **Polaroid (拍立得):** single or **合拍** (two photos side by side / top & bottom), frame color, handwritten caption.
+4. **＋ New** menu and the **My stuff** shelf (tabs for photocards, badges, polaroids); tap anything to pick it up.
 5. ✅ **Check:** make one of each from your own photos.
+6. Acrylic stands moved to "Later" (Diana: optional).
 
 ### M7: Decorate
 1. DIY binder cover: material, color, photo window, stickers.

@@ -41,17 +41,33 @@ export async function shrinkSource(img) {
 }
 
 // Draw the cropped card front at full card size
-export async function renderCardFront(img, crop) {
+export function renderCardFront(img, crop) {
+  return renderCrop(img, crop, CARD_WIDTH, CARD_HEIGHT);
+}
+
+// Draw a cropped photo at any size and save it as a JPEG
+export function renderCrop(img, crop, width, height) {
   const canvas = document.createElement('canvas');
-  canvas.width = CARD_WIDTH;
-  canvas.height = CARD_HEIGHT;
-  const ctx = canvas.getContext('2d');
-  const box = placement(
-    { width: img.naturalWidth, height: img.naturalHeight },
-    { width: CARD_WIDTH, height: CARD_HEIGHT },
-    crop,
-  );
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, box.left, box.top, box.width, box.height);
+  canvas.width = width;
+  canvas.height = height;
+  drawCrop(canvas.getContext('2d'), img, crop, 0, 0, width, height);
   return canvasToBlob(canvas);
 }
+
+// Draw a cropped photo into a box (x, y, width, height) of a canvas
+export function drawCrop(ctx, img, crop, x, y, width, height) {
+  const box = placement(
+    { width: img.naturalWidth, height: img.naturalHeight },
+    { width, height },
+    crop,
+  );
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, width, height);
+  ctx.clip();
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, x + box.left, y + box.top, box.width, box.height);
+  ctx.restore();
+}
+
+export { canvasToBlob };
