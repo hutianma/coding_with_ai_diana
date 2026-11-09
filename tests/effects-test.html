@@ -81,6 +81,21 @@ try {
   const mx = parseFloat(viewerCard().style.getPropertyValue('--mx'));
   check('moving the mouse tilts the card and moves the shine', Math.abs(angleX()) > 5 && mx > 80, `rotateX ${angleX()} / --mx ${mx}`);
 
+  // On a phone: the shine follows turning the phone, then settles back to the middle
+  const motion = (x, y, z) => win.dispatchEvent(new win.DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x, y, z }, acceleration: { x: 0, y: 0, z: 0 } }));
+  // (this test browser isn't an iPhone, so readings use the standard sign: flat = +z)
+  for (let i = 0; i < 5; i++) motion(0, 0, 9.81);
+  await wait(800);
+  const mxFlat = parseFloat(viewerCard().style.getPropertyValue('--mx'));
+  motion(-2, 0, 9.6); // right side tipped down
+  await wait(800);
+  const mxTurned = parseFloat(viewerCard().style.getPropertyValue('--mx'));
+  for (let i = 0; i < 250; i++) motion(-2, 0, 9.6); // …and held there
+  await wait(1500);
+  const mxRested = parseFloat(viewerCard().style.getPropertyValue('--mx'));
+  check('phone turned → the shine moves; held still → it settles back to the middle',
+    mxTurned > mxFlat + 10 && Math.abs(mxRested - 50) < 8, `${mxFlat} → ${mxTurned} → ${mxRested}`);
+
   // Arrow keys don't turn the binder behind the card
   const before = label();
   doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight' })); await wait(300);
