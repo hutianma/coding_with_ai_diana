@@ -135,3 +135,39 @@
 
 .card-back--dark .card-back__text { background: rgba(0, 0, 0, 0.3); }
 .card-back__text:empty { display: none; }
+
+/* A signature drawn on the front sits on top of the photo */
+.card__signature {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Holo cards shimmer faintly even inside the binder */
+.card--holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(125deg,
+    transparent 20%,
+    rgba(255, 120, 200, 0.22) 35%,
+    rgba(120, 220, 255, 0.22) 50%,
+    rgba(180, 255, 150, 0.2) 62%,
+    transparent 78%);
+  mix-blend-mode: color-dodge;
+}
+
+/* Cards you can pick up */
+.card[data-card-id] {
+  cursor: pointer;
+}
+
+.card[data-card-id]:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
