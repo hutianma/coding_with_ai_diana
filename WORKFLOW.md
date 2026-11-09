@@ -46,7 +46,7 @@ A milestone is finished only when **all** of these are true:
 
 | Thing | Convention | Example |
 |---|---|---|
-| Branch | `m<number>-<short-name>` | `m3-drag-to-flip` |
+| Branch | `m<number>-<short-name>` for a milestone, `fix-<short-name>` for a fix to something already shipped | `m3-drag-to-flip`, `fix-shaker-motion` |
 | Commit | Short message that starts with a verb | `Add snap-back easing to page flip` |
 | Pull request | One per milestone, with screenshots or a GIF | *"M3: Drag to flip"* |
 | `main` | Always working and deployable | — |

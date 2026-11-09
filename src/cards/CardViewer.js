@@ -3,6 +3,7 @@
 // is animated.
 import { createCard, cardName, finishOf } from './Card.js';
 import { createCardBack, DEFAULT_BACK } from './CardBack.js';
+import { screenGravity, screenAcceleration } from '../merch/motion.js';
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const MAX_TILT = 14; // degrees
@@ -25,10 +26,13 @@ export function openCardViewer(card, from) {
 // name: what screen readers call it. front / back: the two sides (elements).
 // shape: 'card' | 'badge' | 'polaroid' (sets the size and corners).
 // finish: 'matte' | 'glossy' | 'holo'. from: the element it lifts out of.
-// onGravity(x, y): told which way is down (badges with a 流麻 fill use it).
+// ratio: width / height of the item, for shapes that vary (polaroids).
+// Shaker badges:
+//   onGravity(x, y): which way is down on the screen (from the phone's sensors or the mouse)
+//   onShake(dx, dy): the item was moved by (dx, dy) screen px — by the phone shaking or a finger
+//   dragShakes: dragging moves the item around (and shakes it) instead of turning it over
 // buttons: extra [{ label, onClick }] shown next to Flip. onClose: called when put back.
-// ratio: width / height of the item, for shapes that vary (polaroids)
-export function openViewer({ name, front: frontContent, back: backContent, shape = 'card', ratio = null, finish = 'glossy', from = null, onGravity = null, buttons = [], onClose = null }) {
+export function openViewer({ name, front: frontContent, back: backContent, shape = 'card', ratio = null, finish = 'glossy', from = null, onGravity = null, onShake = null, dragShakes = false, buttons = [], onClose = null }) {
   const dialog = document.createElement('dialog');
   dialog.className = `viewer viewer--shape-${shape}`;
   if (ratio) dialog.style.setProperty('--ratio', ratio); // before it's measured for the lift
@@ -102,13 +106,24 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
   let drag = null;
   cardEl.addEventListener('pointerdown', (event) => {
     if (!event.isPrimary) return;
-    drag = { id: event.pointerId, x0: event.clientX, moved: false };
+    drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, moved: false, offset: { x: 0, y: 0 } };
     try { cardEl.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
   });
   cardEl.addEventListener('pointermove', (event) => {
     if (!drag || event.pointerId !== drag.id) return;
     const dx = event.clientX - drag.x0;
-    if (Math.abs(dx) > 6) drag.moved = true;
+    const dy = event.clientY - drag.y0;
+    // Shaking counts movement in any direction; turning over only counts sideways
+    if (dragShakes ? Math.hypot(dx, dy) > 6 : Math.abs(dx) > 6) drag.moved = true;
+    if (closing) return;
+    if (drag.moved && dragShakes) {
+      // Shake it: the item follows the finger (with a bit of stretch) and the fill sloshes
+      const next = { x: rubber(dx), y: rubber(dy) };
+      onShake?.(next.x - drag.offset.x, next.y - drag.offset.y);
+      drag.offset = next;
+      lift.style.transform = `translate(${next.x}px, ${next.y}px)`;
+      return;
+    }
     if (drag.moved && !reducedMotion.matches) {
       cardEl.classList.remove('is-settling');
       dragAngle = dx * 0.6; // the card follows the finger
@@ -122,16 +137,32 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
       drag = null;
       return;
     }
+    const offset = drag.offset;
     drag = null;
     if (!moved) return flip(); // a tap
+    if (dragShakes) return springBack(offset);
     // Let go: settle on whichever side is facing you
     setFlipped(Math.round((flipAngle + dragAngle) / 180) * 180);
   };
+
+  // A shaken item springs back to the middle (and the fill sloshes once more).
+  // (Shaking only exists without Reduce Motion: the fill isn't live otherwise.)
+  function springBack(offset) {
+    lift.style.transform = '';
+    if (closing) return;
+    onShake?.(-offset.x, -offset.y);
+    lift.animate([{ transform: `translate(${offset.x}px, ${offset.y}px)` }, { transform: 'none' }], {
+      duration: 260,
+      easing: 'cubic-bezier(.3, 1.4, .5, 1)',
+    });
+  }
   cardEl.addEventListener('pointerup', endDrag);
   cardEl.addEventListener('pointercancel', (event) => {
     if (drag && event.pointerId === drag.id) {
+      const offset = drag.offset;
       drag = null;
-      setFlipped(flipAngle);
+      if (dragShakes) springBack(offset);
+      else setFlipped(flipAngle);
     }
   });
 
@@ -160,9 +191,11 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
   function onOrientation(event) {
     if (event.beta == null || event.gamma == null) return;
     baseOrientation ??= { beta: event.beta, gamma: event.gamma };
-    // Real gravity: upright phone → down the screen; tilted sideways → sideways
-    const rad = Math.PI / 180;
-    onGravity?.(clamp(Math.sin(event.gamma * rad)), clamp(Math.sin(event.beta * rad)));
+    // No motion sensor readings (some browsers): estimate "down" from the tilt angles
+    if (!motionGravity) {
+      const rad = Math.PI / 180;
+      sendGravity(clamp(Math.sin(event.gamma * rad)), clamp(Math.sin(event.beta * rad)));
+    }
     target = {
       x: clamp((event.gamma - baseOrientation.gamma) / 25),
       y: clamp((event.beta - baseOrientation.beta) / 25),
@@ -170,8 +203,34 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     startLoop();
   }
 
-  function listenToTilt() {
-    addEventListener('deviceorientation', onOrientation);
+  // Gravity and shaking come from the motion sensor: it knows which way is really down
+  // (also upside down), and how hard the phone moves in any direction
+  let gravity = null; // smoothed, so a shake doesn't look like a change of "down"
+  let motionGravity = false; // the motion sensor is giving gravity readings
+  let sentGravity = null;
+  // Only pass on real changes: sensor jitter would otherwise keep the fill animating
+  // (and the battery draining) while the phone is held still
+  function sendGravity(x, y) {
+    if (!onGravity) return;
+    if (sentGravity && Math.abs(x - sentGravity.x) + Math.abs(y - sentGravity.y) < 0.04) return;
+    sentGravity = { x, y };
+    onGravity(x, y);
+  }
+  function onMotion(event) {
+    const g = screenGravity(event.accelerationIncludingGravity);
+    if (g) {
+      motionGravity = true;
+      gravity = gravity ? { x: gravity.x * 0.8 + g.x * 0.2, y: gravity.y * 0.8 + g.y * 0.2 } : g;
+      sendGravity(gravity.x, gravity.y);
+    }
+    const a = screenAcceleration(event.acceleration);
+    // Ignore the tiny jitter of a hand holding still. Metres per second² → a few px of push.
+    if (a && onShake && Math.hypot(a.x, a.y) > 1.2) onShake(a.x * 1.6, a.y * 1.6);
+  }
+
+  function listenToTilt({ orientation = true, motion = true } = {}) {
+    if (orientation) addEventListener('deviceorientation', onOrientation);
+    if (motion && (onGravity || onShake)) addEventListener('devicemotion', onMotion);
   }
 
   // iPhone: tilt needs a one-time "Allow" from a button tap. Computers (mouse) never ask.
@@ -182,13 +241,19 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
     if (needsPermission && !motionAllowed) {
       motionBtn.hidden = false;
       motionBtn.addEventListener('click', async () => {
-        try {
-          motionAllowed = (await DeviceOrientationEvent.requestPermission()) === 'granted';
-        } catch {
-          motionAllowed = false;
-        }
+        // Ask for both, separately: the tilt angles (shine) and the motion sensor
+        // (gravity, shaking). Either one still works if the other is refused.
+        const ask = async (Api) => {
+          if (typeof Api === 'undefined' || typeof Api.requestPermission !== 'function') return true;
+          try { return (await Api.requestPermission()) === 'granted'; } catch { return false; }
+        };
+        const [orientation, motion] = await Promise.all([
+          ask(globalThis.DeviceOrientationEvent),
+          onGravity || onShake ? ask(globalThis.DeviceMotionEvent) : false,
+        ]);
+        motionAllowed = orientation || motion;
         motionBtn.hidden = true;
-        if (motionAllowed) listenToTilt();
+        listenToTilt({ orientation, motion });
       });
     } else {
       listenToTilt();
@@ -232,9 +297,12 @@ export function openViewer({ name, front: frontContent, back: backContent, shape
   function close() {
     if (!dialog.open || closing) return;
     closing = true;
+    drag = null;
+    lift.style.transform = ''; // put back from the middle, even mid-shake
     cancelAnimationFrame(frame);
     onClose?.();
     removeEventListener('deviceorientation', onOrientation);
+    removeEventListener('devicemotion', onMotion);
     let done = false;
     const finish = () => {
       if (done) return;
@@ -303,4 +371,9 @@ function makeLayer(className) {
 
 function clamp(v) {
   return Math.max(-1, Math.min(1, v));
+}
+
+// Follows the finger, but harder the further it goes (like a rubber band), max ~60 px
+function rubber(d) {
+  return Math.sign(d) * 60 * (1 - Math.exp(-Math.abs(d) / 90));
 }
