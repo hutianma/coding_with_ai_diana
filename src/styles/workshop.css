@@ -385,3 +385,80 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ---------- Signature step ---------- */
+
+.sign {
+  position: relative;
+  width: min(62vw, 260px, (100svh - 330px) * 55 / 85);
+  aspect-ratio: 55 / 85;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--pocket-bg);
+  box-shadow: 0 6px 16px rgba(40, 10, 30, 0.2);
+}
+
+.sign__front,
+.sign__pad {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sign__front { object-fit: cover; }
+
+.sign__pad { cursor: crosshair; }
+
+.pen::before {
+  content: "";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 6px;
+  vertical-align: -0.05em;
+  border-radius: 50%;
+  background: var(--pen);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.sign__clear {
+  border: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+/* ---------- Finish preview on the back step ---------- */
+
+.back-preview__front { position: relative; }
+
+.back-preview__sig {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.back-preview__sig[hidden] { display: none; }
+
+.back-preview__front::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.back-preview__front[data-finish="glossy"]::after {
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.4) 45%, transparent 58%);
+}
+
+.back-preview__front[data-finish="holo"]::after {
+  background: linear-gradient(125deg,
+    transparent 15%,
+    rgba(255, 120, 200, 0.35) 32%,
+    rgba(120, 220, 255, 0.35) 48%,
+    rgba(180, 255, 150, 0.3) 62%,
+    transparent 80%);
+  mix-blend-mode: color-dodge;
+}
