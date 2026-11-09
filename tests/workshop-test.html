@@ -32,7 +32,7 @@ function testPicture(w, h, hue, name) {
 }
 
 async function load(q = '') {
-  await new Promise((r) => { f.onload = r; f.src = '/index.html?' + q; });
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?memory&' + q; });
   win = f.contentWindow; doc = win.document;
   // Wait for the binder (saved data loads first)
   for (let i = 0; i < 400 && !doc.querySelector('.book'); i++) await wait(50);

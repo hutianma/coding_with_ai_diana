@@ -177,7 +177,7 @@ try {
 
   // ---------- The ＋ New menu ----------
   await new Promise((res) => { const q = indexedDB.deleteDatabase('pocket-fandom'); q.onsuccess = q.onerror = q.onblocked = res; setTimeout(res, 1500); });
-  await new Promise((r) => { f.onload = r; f.src = '/index.html?open'; });
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?memory&open'; });
   win = f.contentWindow; doc = win.document;
   await until(() => doc.querySelector('.book'), 20000);
   doc.querySelector('[data-action="new"]').click(); await wait(100);
@@ -198,7 +198,7 @@ try {
   check('badge: no fill → no pieces, no Shake', !doc.querySelector('.badge-preview .badge__fill') && doc.querySelector('.badge-preview__shake').hidden);
   doc.querySelector('input[name="fill"][value="hearts"]').click();
   primary().click();
-  await until(() => doc.querySelector('dialog.my-cards[open]'));
+  await until(() => doc.querySelector('dialog.my-cards[open]'), 15000);
   check('after saving, My stuff opens on Badges', doc.querySelector('.my-cards__tab[aria-selected="true"]')?.dataset.tab === 'badges'
     && doc.querySelectorAll('.my-cards__item .badge').length === 1);
   const savedBadge = doc.querySelector('.my-cards__item .badge');

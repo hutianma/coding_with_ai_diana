@@ -1,6 +1,6 @@
 // Draw a signature with a finger, pen or mouse on a transparent canvas the size of
 // the card. The result is a PNG drawn on top of the card front.
-import { loadImage, unloadImage } from './imageTools.js';
+import { loadImage, unloadImage, canvasToBlob } from './imageTools.js';
 
 export const PEN_COLORS = [
   { value: '#c9a227', name: 'Gold' },
@@ -110,9 +110,7 @@ export function createSignaturePad(canvas, { colors = PEN_COLORS, lineWidth = LI
     // The signature as a PNG, or null if there's nothing drawn
     toBlob() {
       if (!hasInk) return Promise.resolve(null);
-      return new Promise((resolve, reject) => {
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not save the signature.'))), 'image/png');
-      });
+      return canvasToBlob(canvas, 'image/png');
     },
   };
 }

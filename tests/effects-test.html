@@ -23,7 +23,7 @@ async function until(test, ms = 8000) {
 }
 
 async function load(q) {
-  await new Promise((r) => { f.onload = r; f.src = '/index.html?' + q; });
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?memory&' + q; });
   win = f.contentWindow; doc = win.document;
   await until(() => doc.querySelector('.book'), 20000);
   // Animations run on a fake clock so tilting is instant and predictable

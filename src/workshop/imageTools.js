@@ -24,10 +24,39 @@ export function unloadImage(img) {
   if (img?.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
 }
 
+const TO_BLOB_WAIT_MS = 4000;
+
+// Canvas → image file. toBlob works in the background; if it never answers (it can
+// stall when the device is busy), fall back to toDataURL after a few seconds, so saving
+// never gets stuck on "busy".
 function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.88) {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not save the image.'))), type, quality);
+    let done = false;
+    const finish = (blob) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (blob) resolve(blob);
+      else reject(new Error('Could not save the image.'));
+    };
+    const timer = setTimeout(() => {
+      try {
+        finish(dataUrlToBlob(canvas.toDataURL(type, quality)));
+      } catch {
+        finish(null);
+      }
+    }, TO_BLOB_WAIT_MS);
+    canvas.toBlob(finish, type, quality);
   });
+}
+
+function dataUrlToBlob(url) {
+  const [head, data] = url.split(',');
+  const type = head.match(/data:([^;]+)/)?.[1] ?? 'application/octet-stream';
+  const bytes = atob(data);
+  const array = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) array[i] = bytes.charCodeAt(i);
+  return new Blob([array], { type });
 }
 
 // A copy of the photo no bigger than SOURCE_MAX on its longest side
