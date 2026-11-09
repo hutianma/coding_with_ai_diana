@@ -8,8 +8,9 @@ export const FINISHES = [
 
 // A short name for a card, for screen readers and lists
 export function cardName(card) {
-  if (card.placeholder) return `Sample card ${card.number}`;
-  return card.back?.text ? `Photocard: ${card.back.text}` : 'Photocard';
+  const name = card.placeholder ? `Sample card ${card.number}`
+    : card.back?.text ? `Photocard: ${card.back.text}` : 'Photocard';
+  return card.signature ? `${name} (signed)` : name;
 }
 
 // Draws the front of one photocard: a placeholder (demo binder) or your photo,
@@ -45,6 +46,6 @@ export function createCard(card) {
   }
 
   el.setAttribute('role', 'img');
-  el.setAttribute('aria-label', cardName(card) + (card.signature ? ' (signed)' : ''));
+  el.setAttribute('aria-label', cardName(card));
   return el;
 }

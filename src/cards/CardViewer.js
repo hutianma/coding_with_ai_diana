@@ -188,7 +188,10 @@ export function openCardViewer(card, from) {
     if (!dialog.open) return;
     cancelAnimationFrame(frame);
     removeEventListener('deviceorientation', onOrientation);
+    let done = false;
     const finish = () => {
+      if (done) return;
+      done = true;
       dialog.close();
       dialog.remove();
       from?.focus?.();
@@ -205,6 +208,7 @@ export function openCardViewer(card, from) {
       duration: 320,
       easing: 'cubic-bezier(.4, 0, .6, 1)',
     }).finished.then(finish, finish);
+    setTimeout(finish, 450); // close even if the animation never finishes (e.g. a background tab)
   }
 
   $('.viewer__close').addEventListener('click', close);
