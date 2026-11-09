@@ -19,19 +19,21 @@ export const FILLS = [
 //   overlap – how closely pieces can pack (powder packs tighter)
 //   dust    – drawn as tiny glinting flecks (fast to draw in large numbers)
 const STYLES = {
-  glitter: { count: 95, size: [13, 24], weight: [0.55, 1.3], flutter: 0.035, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
-  snow: { count: 100, size: [8, 20], weight: [0.3, 0.75], flutter: 0.06, colors: ['#ffffff', '#f2f8ff'] },
-  stars: { count: 44, size: [22, 38], weight: [0.7, 1.4], flutter: 0.02, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
-  hearts: { count: 44, size: [22, 36], weight: [0.7, 1.4], flutter: 0.02, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
-  sakura: { count: 40, size: [22, 34], weight: [0.4, 0.95], flutter: 0.07, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
-  // Fine gold powder: lots of tiny flecks that sparkle and hang in the liquid
-  gold: { count: 320, size: [2.5, 6], weight: [0.2, 0.6], flutter: 0.03, overlap: 0.6, dust: true, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
+  glitter: { count: 135, size: [12, 22], weight: [0.6, 1.25], flutter: 0.012, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
+  snow: { count: 140, size: [7, 18], weight: [0.4, 0.8], flutter: 0.02, colors: ['#ffffff', '#f2f8ff'] },
+  stars: { count: 62, size: [20, 34], weight: [0.75, 1.3], flutter: 0.008, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
+  hearts: { count: 62, size: [20, 32], weight: [0.75, 1.3], flutter: 0.008, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
+  sakura: { count: 56, size: [20, 30], weight: [0.5, 0.95], flutter: 0.025, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
+  // Fine gold powder: lots of tiny flecks that sparkle and hang in the gel
+  gold: { count: 440, size: [2.5, 6], weight: [0.3, 0.7], flutter: 0.01, overlap: 0.6, dust: true, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
 };
 
-const GRAVITY = 0.12; // px per frame²: still liquid, but lively (top to bottom in ~2.5 s)
+// A thick, gel-like liquid: pieces sink slowly (top to bottom in about 6 s), and a shake
+// sends them up through the gel, which soon slows them down again
+const GRAVITY = 0.085; // px per frame²
+const DRAG = 0.92; // how much speed the gel takes away each frame (lower = thicker)
 const SLEEP_FRAMES = 30; // still for half a second → asleep
 const QUIET = 0.0036; // average movement under 0.06 px a frame counts as still (far too small to see)
-const DRAG = 0.96; // liquid slows everything down
 const RIM = 0.9; // pieces stay within 90% of the radius (inside the rim)
 
 // A repeatable random number generator, so a badge always looks the same when settled
@@ -78,7 +80,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       weight: style.weight[0] + random() * (style.weight[1] - style.weight[0]),
       // Its own side-to-side drift
       flutter: style.flutter * (0.5 + random()),
-      freq: 0.03 + random() * 0.05,
+      freq: 0.015 + random() * 0.025, // slow, gentle rocking
       phase: random() * Math.PI * 2,
     };
   });
@@ -296,21 +298,21 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     // direction, and the liquid swirls, so they scatter like a shaken snow globe
     push(dx, dy) {
       wakeAll();
-      const strength = Math.hypot(dx, dy) * 0.45;
+      const strength = Math.hypot(dx, dy) * 0.6;
       swirl(strength * 0.12);
       for (const p of pieces) {
         const along = 0.4 + random() * 1.2;
         const angle = random() * Math.PI * 2;
         const kick = strength * random() * 0.9;
-        p.vx += -dx * 0.45 * along + Math.cos(angle) * kick;
-        p.vy += -dy * 0.45 * along + Math.sin(angle) * kick;
+        p.vx += -dx * 0.6 * along + Math.cos(angle) * kick;
+        p.vy += -dy * 0.6 * along + Math.sin(angle) * kick;
         limit(p);
       }
       this.start();
     },
 
     // Swirl everything up and out
-    shake(strength = 9 * k) {
+    shake(strength = 14 * k) {
       wakeAll();
       swirl(strength * 0.15);
       for (const p of pieces) {
