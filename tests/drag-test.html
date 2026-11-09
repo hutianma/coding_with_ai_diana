@@ -121,6 +121,25 @@ function check(name, ok, extra = '') {
     doc.querySelector('[data-dir=next]').click(); await wait(600);
     check('phone: arrows still work after dragging', label() === 'Page 3 of 4', label());
 
+    await load(390, 844, 'open');
+    pointer('pointerdown', cx, cy);
+    for (let i = 1; i <= 4; i++) { await wait(4); pointer('pointermove', cx - (w * 0.3 * i) / 4, cy); }
+    await wait(400); // fast, then hold still before letting go
+    pointer('pointerup', cx - w * 0.3, cy); await wait(600);
+    check('phone: fast drag, then hold still → springs back (not a flick)', label() === 'Page 1 of 4', label());
+
+    await load(390, 844, 'open');
+    pointer('pointerdown', cx, cy); // release never arrives (e.g. let go outside the window)
+    await drag(cx, cy, -w * 0.7, 0);
+    check('phone: a lost release doesn\'t block the next drag', label() === 'Page 2 of 4', label());
+
+    clicks = 0;
+    book.addEventListener('click', () => clicks++);
+    await drag(cx, cy, -w * 0.3, 0);
+    await wait(700);
+    doc.elementFromPoint(cx, cy).click(); // a real tap, well after the drag
+    check('phone: a later tap is not swallowed', clicks === 1, 'clicks ' + clicks);
+
     // ---------- Computer ----------
     await load(1280, 800, 'open');
     r = rect(); cy = r.top + r.height / 2;
@@ -133,6 +152,14 @@ function check(name, ok, extra = '') {
 
     await drag(r.left + r.width * 0.15, cy, page, 0);
     check('computer: dragging the empty left side on page 1 does nothing', label() === 'Page 1 of 4', label());
+
+    clicks = 0;
+    book.addEventListener('click', () => clicks++);
+    const rx = r.left + r.width * 0.85;
+    await drag(rx, cy, 40, 0); // right page dragged the wrong way
+    doc.elementFromPoint(rx + 40, cy).click();
+    check('computer: dragging the right page rightwards is not a turn (click kept)',
+      label() === 'Page 1 of 4' && clicks === 1, label() + ' clicks ' + clicks);
   } catch (e) {
     results.push('ERROR ' + e.stack);
   }
