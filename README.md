@@ -131,7 +131,10 @@ Card {
   front: Blob             // photo cropped to 55:85, about 600px tall
   back: CardBack          // { color, pattern, text?, photo? }
   finish: "matte" | "glossy" | "holo"
-  signature?: Blob        // handwritten, drawn with a finger
+  signature?: Blob        // handwritten, drawn with a finger (transparent PNG over the front)
+  pen?: string            // signature ink color, remembered for editing
+  source: Blob            // a smaller copy of the original photo, for re-cropping
+  crop: { zoom, x, y }    // how the photo was framed
   tags: string[]          // e.g. member, album, era
   createdAt: Date
 }
