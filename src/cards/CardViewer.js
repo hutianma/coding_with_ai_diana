@@ -27,9 +27,11 @@ export function openCardViewer(card, from) {
 // finish: 'matte' | 'glossy' | 'holo'. from: the element it lifts out of.
 // onGravity(x, y): told which way is down (badges with a 流麻 fill use it).
 // buttons: extra [{ label, onClick }] shown next to Flip. onClose: called when put back.
-export function openViewer({ name, front: frontContent, back: backContent, shape = 'card', finish = 'glossy', from = null, onGravity = null, buttons = [], onClose = null }) {
+// ratio: width / height of the item, for shapes that vary (polaroids)
+export function openViewer({ name, front: frontContent, back: backContent, shape = 'card', ratio = null, finish = 'glossy', from = null, onGravity = null, buttons = [], onClose = null }) {
   const dialog = document.createElement('dialog');
   dialog.className = `viewer viewer--shape-${shape}`;
+  if (ratio) dialog.style.setProperty('--ratio', ratio); // before it's measured for the lift
   dialog.setAttribute('aria-label', name);
   dialog.innerHTML = `
     <div class="viewer__stage">

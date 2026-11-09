@@ -41,6 +41,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
   const style = STYLES[fill];
   const ctx = canvas.getContext('2d');
   const size = canvas.width;
+  const k = size / 600; // sizes and speeds are tuned for a 600 px badge
   const center = size / 2;
   const radius = (size / 2) * RIM;
   const random = seeded(seed);
@@ -51,7 +52,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
   const pieces = !style ? [] : Array.from({ length: style.count }, () => {
     const angle = random() * Math.PI * 2;
     const dist = Math.sqrt(random()) * radius * 0.85;
-    const s = style.size[0] + random() * (style.size[1] - style.size[0]);
+    const s = (style.size[0] + random() * (style.size[1] - style.size[0])) * k;
     return {
       x: center + Math.cos(angle) * dist,
       y: center + Math.sin(angle) * dist,
@@ -69,8 +70,8 @@ export function createShaker(canvas, { fill, seed = 1 }) {
   function step() {
     let energy = 0;
     for (const p of pieces) {
-      p.vx = (p.vx + gravity.x * GRAVITY * p.weight + (random() - 0.5) * 0.02) * DRAG;
-      p.vy = (p.vy + gravity.y * GRAVITY * p.weight + (random() - 0.5) * 0.02) * DRAG;
+      p.vx = (p.vx + (gravity.x * GRAVITY * p.weight + (random() - 0.5) * 0.02) * k) * DRAG;
+      p.vy = (p.vy + (gravity.y * GRAVITY * p.weight + (random() - 0.5) * 0.02) * k) * DRAG;
       p.x += p.vx;
       p.y += p.vy;
       p.rot += p.spin + p.vx * 0.01;
@@ -113,7 +114,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     const energy = step();
     draw();
     // Stop when everything has settled (saves battery); a tilt or shake wakes it up
-    quietFrames = energy < 0.0004 ? quietFrames + 1 : 0;
+    quietFrames = energy < 0.0004 * k * k ? quietFrames + 1 : 0;
     if (quietFrames < 90) frame = requestAnimationFrame(loop);
   }
 
@@ -136,7 +137,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     },
 
     // Swirl everything up
-    shake(strength = 6) {
+    shake(strength = 6 * k) {
       for (const p of pieces) {
         p.vx += (random() - 0.5) * strength * 2;
         p.vy += (random() - 0.8) * strength * 2;

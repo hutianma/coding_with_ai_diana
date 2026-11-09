@@ -4,6 +4,7 @@ import { createCropper } from '../workshop/Cropper.js';
 import { loadImage, unloadImage, shrinkSource, renderCrop, drawCrop, canvasToBlob } from '../workshop/imageTools.js';
 import { createSignaturePad } from '../workshop/SignaturePad.js';
 import { makeId } from '../storage/ids.js';
+import { pickPhotos } from '../workshop/pickPhotos.js';
 import { createBadge, BADGE_SIZE, RIM_COLORS } from './Badge.js';
 import { FILLS } from './shaker.js';
 import { LAYOUTS, FRAME_COLORS, polaroidSizes, polaroidBoxes, polaroidRatio } from './Polaroid.js';
@@ -14,29 +15,15 @@ const CAPTION_PENS = [
   { value: '#e0508c', name: 'Pink' },
 ];
 
-let lastBadge = { fill: 'glitter', rim: RIM_COLORS[0].value };
-let lastPolaroid = { layout: 'single', frame: FRAME_COLORS[0].value };
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-// Ask for one photo. Resolves to a File, or null if the picker was cancelled.
-export function pickPhoto() {
-  return new Promise((resolve) => {
-    document.querySelectorAll('input.photo-picker').forEach((old) => old.remove());
-    const input = document.createElement('input');
-    input.className = 'photo-picker';
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.hidden = true;
-    input.addEventListener('change', () => {
-      input.remove();
-      resolve(input.files[0] ?? null);
-    });
-    input.addEventListener('cancel', () => {
-      input.remove();
-      resolve(null);
-    });
-    document.body.append(input);
-    input.click();
-  });
+let lastBadge = { fill: 'glitter', rim: RIM_COLORS[0].value };
+let lastPolaroid = { layout: 'single', frame: FRAME_COLORS[0].value, pen: CAPTION_PENS[0].value };
+
+// Ask for one photo: a File, or null if the picker was cancelled
+async function pickPhoto() {
+  const [file] = await pickPhotos();
+  return file ?? null;
 }
 
 // The shared window: title, ✕, an error line, and Back / Next buttons
@@ -152,7 +139,9 @@ export async function openBadgeWorkshop({ existing = null, onSave }) {
   let style = existing ? { fill: existing.fill, rim: existing.rim } : { ...lastBadge };
   const seed = existing?.seed ?? Math.floor(Math.random() * 1e9);
   let image = null;
-  let previewBlob = null;
+  let previewBlob = null; // the badge photo drawn for the style step…
+  let previewKey = null; // …and the crop it was drawn with
+  let previewToken = 0;
   let previewBadge = null;
   let step = 'crop';
 
@@ -187,14 +176,22 @@ export async function openBadgeWorkshop({ existing = null, onSave }) {
       sheet.primary.textContent = 'Save badge';
       check(sheet.body, 'fill', style.fill);
       check(sheet.body, 'rim', style.rim);
-      previewBlob = await renderCrop(image, cropper.crop, BADGE_SIZE, BADGE_SIZE);
+      const key = JSON.stringify(cropper.crop);
+      if (key !== previewKey) {
+        const token = ++previewToken;
+        const blob = await renderCrop(image, cropper.crop, BADGE_SIZE, BADGE_SIZE);
+        if (token !== previewToken || step !== 'style') return; // the user moved on
+        previewBlob = blob;
+        previewKey = key;
+      }
       drawPreview();
     }
   }
 
   function drawPreview() {
     previewBadge?.shaker?.stop();
-    previewBadge = createBadge({ image: previewBlob, fill: style.fill, rim: style.rim, seed }, { live: true });
+    // Reduce Motion: a still preview, settled, with no Shake
+    previewBadge = createBadge({ image: previewBlob, fill: style.fill, rim: style.rim, seed }, { live: !reducedMotion.matches });
     $('.badge-preview').replaceChildren(previewBadge);
     previewBadge.shaker?.start();
     $('.badge-preview__shake').hidden = !previewBadge.shaker;
@@ -218,7 +215,7 @@ export async function openBadgeWorkshop({ existing = null, onSave }) {
     try {
       const crop = { ...cropper.crop };
       const [badgeImage, source] = await Promise.all([
-        previewBlob ?? renderCrop(image, crop, BADGE_SIZE, BADGE_SIZE),
+        previewKey === JSON.stringify(crop) ? previewBlob : renderCrop(image, crop, BADGE_SIZE, BADGE_SIZE),
         existing ? existing.source : shrinkSource(image),
       ]);
       const item = {
@@ -296,7 +293,9 @@ export async function openPolaroidWorkshop({ existing = null, onSave }) {
   `;
   const $ = (sel) => sheet.body.querySelector(sel);
 
+  let closed = false;
   sheet.onClose = () => {
+    closed = true;
     for (const slot of slots) {
       slot.cropper?.destroy();
       unloadImage(slot.image);
@@ -334,7 +333,7 @@ export async function openPolaroidWorkshop({ existing = null, onSave }) {
       zooms.append(zoom);
 
       const cropper = createCropper({ area: cell, frame: cell, img: cell.querySelector('img'), zoomInput: zoom.querySelector('input') });
-      const slot = { image: null, source: null, crop: null, cropper, cell, zoom };
+      const slot = { image: null, source: null, cropper, cell, zoom };
       // Keep photos already chosen when switching layouts
       const old = keep[i];
       if (old?.image) setSlotPhoto(slot, old.image, old.source, null);
@@ -392,6 +391,7 @@ export async function openPolaroidWorkshop({ existing = null, onSave }) {
     padCanvas.width = sizes.caption.width;
     padCanvas.height = sizes.caption.height;
     pad = createSignaturePad(padCanvas, { colors: CAPTION_PENS, lineWidth: 8 });
+    pad.setColor(existing?.pen ?? lastPolaroid.pen);
     padLayout = layoutName;
   }
 
@@ -431,14 +431,13 @@ export async function openPolaroidWorkshop({ existing = null, onSave }) {
       sheet.setTitle('Caption');
       sheet.secondary.textContent = 'Back';
       sheet.primary.textContent = 'Save polaroid';
-      if (padLayout !== layoutName) {
-        buildCaption();
-        if (existing?.caption && existing.layout === layoutName && !pad.changed) await pad.reset(existing.caption);
-      } else {
-        drawPhotos($('.polaroid-caption__photo'));
-      }
+      const fresh = padLayout !== layoutName;
+      if (fresh) buildCaption();
+      else drawPhotos($('.polaroid-caption__photo'));
       $('.polaroid-caption').style.setProperty('--frame', frame);
       check(sheet.body, 'pen', pad.color);
+      // Show the saved caption to add to (same layout only: the strip size depends on it)
+      if (fresh && existing?.caption && existing.layout === layoutName) await pad.reset(existing.caption);
     }
   }
 
@@ -475,7 +474,7 @@ export async function openPolaroidWorkshop({ existing = null, onSave }) {
         pen: pad.color,
       };
       await onSave(item, existing);
-      if (!existing) lastPolaroid = { layout: layoutName, frame };
+      if (!existing) lastPolaroid = { layout: layoutName, frame, pen: pad.color };
     } catch (err) {
       sheet.setBusy(false);
       sheet.showError(`Couldn't save this polaroid. ${err.message ?? ''}`.trim());
@@ -498,19 +497,22 @@ export async function openPolaroidWorkshop({ existing = null, onSave }) {
     else sheet.close();
   });
 
-  // Editing: load the saved photos into their cells first
+  showStep('layout');
+
+  // Editing: load the saved photos into their cells (in the background)
   if (existing) {
     buildPhotoEditor();
     slotsLayout = layoutName;
-    await Promise.all(existing.photos.map(async (p, i) => {
-      if (!slots[i]) return;
+    const editorSlots = slots;
+    existing.photos.forEach(async (p, i) => {
       try {
         const image = await loadImage(p.source);
+        // Closed, or the layout was rebuilt meanwhile: let go of the photo
+        if (closed || slots !== editorSlots || !slots[i]) return unloadImage(image);
         setSlotPhoto(slots[i], image, p.source, p.crop);
       } catch {
         sheet.showError("A saved photo couldn't be opened. Choose it again.");
       }
-    }));
+    });
   }
-  showStep('layout');
 }

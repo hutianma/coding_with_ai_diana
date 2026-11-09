@@ -49,7 +49,16 @@ function openIndexedDb() {
         }
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      // A newer version of the app (another tab) needs to upgrade the database:
+      // let it, and reload this tab so it runs the new version too
+      db.onversionchange = () => {
+        db.close();
+        location.reload();
+      };
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
     request.onblocked = () => {
       const err = new Error('Pocket Fandom is open in another tab. Close the other tab and reload.');

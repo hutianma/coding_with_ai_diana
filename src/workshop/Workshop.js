@@ -6,6 +6,7 @@ import { FINISHES } from '../cards/Card.js';
 import { createSignaturePad, PEN_COLORS } from './SignaturePad.js';
 import { BACK_COLORS, BACK_PATTERNS, BACK_TEXT_MAX, DEFAULT_BACK, createCardBack } from '../cards/CardBack.js';
 import { makeId } from '../storage/ids.js';
+import { pickPhotos } from './pickPhotos.js';
 
 let lastBack = { ...DEFAULT_BACK }; // a batch of new cards starts with the previous card's back
 let lastFinish = 'glossy'; // …and finish
@@ -13,23 +14,9 @@ let lastPen = PEN_COLORS[0].value; // …and signature pen
 
 // Ask for photos, then make a card from each.
 // onSave(card) is called for every finished card and must save it.
-export function pickPhotosForNewCards(onSave) {
-  // A picker that was cancelled last time may still be here
-  document.querySelectorAll('input.photo-picker').forEach((old) => old.remove());
-  const input = document.createElement('input');
-  input.className = 'photo-picker';
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.multiple = true;
-  input.hidden = true;
-  input.addEventListener('change', () => {
-    const files = [...input.files];
-    input.remove();
-    if (files.length) openWorkshop({ files, onSave });
-  });
-  input.addEventListener('cancel', () => input.remove());
-  document.body.append(input);
-  input.click();
+export async function pickPhotosForNewCards(onSave) {
+  const files = await pickPhotos({ multiple: true });
+  if (files.length) openWorkshop({ files, onSave });
 }
 
 // Edit an existing card (its saved original photo, crop and back)

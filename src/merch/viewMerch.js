@@ -22,13 +22,12 @@ export function openMerchViewer(item, from) {
     });
   }
 
-  const dialog = openViewer({
+  return openViewer({
     name: polaroidName(item),
     shape: 'polaroid',
+    ratio: polaroidRatio(item),
     front: createPolaroid(item),
     back: createPolaroidBack(item),
     from,
   });
-  dialog.style.setProperty('--ratio', polaroidRatio(item));
-  return dialog;
 }

@@ -26,9 +26,14 @@ if (params.has('demo')) {
 
 async function start() {
   let collection;
-  let merch;
+  let merch = {};
+  let merchProblem = false;
   try {
-    [collection, merch] = await Promise.all([loadCollection(), loadMerch()]);
+    [collection, merch] = await Promise.all([
+      loadCollection(),
+      // Badges and polaroids failing to load shouldn't hide your cards
+      loadMerch().catch(() => { merchProblem = true; return {}; }),
+    ]);
   } catch (err) {
     showProblem(`Your saved cards couldn't be loaded. ${err.message ?? ''}`);
     return;
@@ -44,6 +49,9 @@ async function start() {
     let notice = null;
     if (!savingIsAvailable()) {
       notice = createNotice("Saving isn't working in this browser right now (private browsing?). Cards you make won't be kept. Try reloading the page.");
+      notice.classList.add('notice--warning');
+    } else if (merchProblem) {
+      notice = createNotice("Your badges and polaroids couldn't be loaded. Try reloading the page.");
       notice.classList.add('notice--warning');
     } else if (!hasCards) {
       notice = createNotice('These are sample cards. Tap “＋ New” to make your own from your photos.');

@@ -14,6 +14,8 @@ export const RIM_COLORS = [
   { value: '#2b2230', name: 'Night' },
 ];
 
+const THUMB_FILL_SIZE = 240; // a smaller fill canvas for still badges (shelf thumbnails)
+
 // live: the fill moves (in the viewer and the workshop preview); otherwise it's drawn settled
 export function createBadge(item, { live = false } = {}) {
   const el = document.createElement('div');
@@ -32,7 +34,7 @@ export function createBadge(item, { live = false } = {}) {
   if (item.fill && item.fill !== 'none') {
     const canvas = document.createElement('canvas');
     canvas.className = 'badge__fill';
-    canvas.width = canvas.height = BADGE_SIZE;
+    canvas.width = canvas.height = live ? BADGE_SIZE : THUMB_FILL_SIZE;
     el.append(canvas);
     const shaker = createShaker(canvas, { fill: item.fill, seed: item.seed ?? 1 });
     shaker.settle(170); // partly sunk: pieces drift in the lower half, like a badge just set down
