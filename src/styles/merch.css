@@ -78,3 +78,49 @@
   border-radius: 50%;
   border: 1.6cqi solid #a7acb5;
 }
+
+/* ---------- Polaroid (拍立得) ---------- */
+
+.polaroid,
+.polaroid-back {
+  position: relative;
+  aspect-ratio: var(--ratio, 0.63);
+  border-radius: 2px;
+  box-shadow: 0 4px 10px rgba(40, 10, 30, 0.22);
+}
+
+.polaroid {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.5), transparent 40%),
+    var(--frame, #fbfaf7);
+}
+
+.polaroid__photo,
+.polaroid__caption {
+  position: absolute;
+  object-fit: cover;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* A thin inner edge where the photo meets the frame */
+.polaroid__photo {
+  background: #1d1a22;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.polaroid-back {
+  container-type: inline-size;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.025) 0 1px, transparent 1px 3px),
+    #eceae6;
+}
+
+.polaroid-back__date {
+  position: absolute;
+  right: 8%;
+  bottom: 6%;
+  font-size: 5cqi;
+  color: rgba(40, 30, 40, 0.45);
+  font-family: ui-monospace, Menlo, monospace;
+}

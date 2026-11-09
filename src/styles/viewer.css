@@ -47,6 +47,40 @@
   transform-origin: center;
 }
 
+/* Badges are round */
+.viewer--shape-badge .viewer__lift {
+  width: min(78vw, 360px, 100svh - 220px);
+  aspect-ratio: 1;
+}
+
+.viewer--shape-badge .viewer__face,
+.viewer--shape-badge .viewer__glare { border-radius: 50%; }
+
+.viewer--shape-badge .viewer__face { box-shadow: 0 24px 50px -12px rgba(20, 5, 15, 0.55); }
+
+.viewer__face > .badge,
+.viewer__face > .badge-back {
+  position: absolute;
+  inset: 0;
+  box-shadow: none;
+}
+
+/* Polaroids: their own size (set by the item: --ratio) */
+.viewer--shape-polaroid .viewer__lift {
+  width: min(80vw, 340px, (100svh - 190px) * var(--ratio, 0.63));
+  aspect-ratio: var(--ratio, 0.63);
+}
+
+.viewer--shape-polaroid .viewer__face { border-radius: 4px; }
+
+.viewer__face > .polaroid,
+.viewer__face > .polaroid-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  box-shadow: none;
+}
+
 .viewer__card {
   position: relative;
   width: 100%;

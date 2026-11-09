@@ -1,5 +1,6 @@
-// Pick up a card: it lifts out of its pocket, and you can flip it to see the back
-// and tilt it to make the surface shine. Only this one card is animated.
+// Pick something up (a photocard, badge or polaroid): it lifts out of its place, and you
+// can flip it to see the back and tilt it to make the surface shine. Only this one item
+// is animated.
 import { createCard, cardName, finishOf } from './Card.js';
 import { createCardBack, DEFAULT_BACK } from './CardBack.js';
 
@@ -9,13 +10,31 @@ let motionAllowed = false; // iPhone asks once per visit before sharing the phon
 
 // card: the card to show. from: the card element in the binder (where it lifts from).
 export function openCardViewer(card, from) {
+  const front = createCard(card);
+  front.removeAttribute('role');
+  front.removeAttribute('aria-label');
+  return openViewer({
+    name: cardName(card),
+    front,
+    back: createCardBack(card.back ?? { ...DEFAULT_BACK, text: 'Sample' }),
+    finish: finishOf(card),
+    from,
+  });
+}
+
+// name: what screen readers call it. front / back: the two sides (elements).
+// shape: 'card' | 'badge' | 'polaroid' (sets the size and corners).
+// finish: 'matte' | 'glossy' | 'holo'. from: the element it lifts out of.
+// onGravity(x, y): told which way is down (badges with a 流麻 fill use it).
+// buttons: extra [{ label, onClick }] shown next to Flip. onClose: called when put back.
+export function openViewer({ name, front: frontContent, back: backContent, shape = 'card', finish = 'glossy', from = null, onGravity = null, buttons = [], onClose = null }) {
   const dialog = document.createElement('dialog');
-  dialog.className = 'viewer';
-  dialog.setAttribute('aria-label', cardName(card));
+  dialog.className = `viewer viewer--shape-${shape}`;
+  dialog.setAttribute('aria-label', name);
   dialog.innerHTML = `
     <div class="viewer__stage">
       <div class="viewer__lift">
-        <div class="viewer__card" role="button" tabindex="0" aria-pressed="false" aria-label="Flip the card">
+        <div class="viewer__card" role="button" tabindex="0" aria-pressed="false" aria-label="Flip it over">
           <div class="viewer__face viewer__face--front"></div>
           <div class="viewer__face viewer__face--back"></div>
         </div>
@@ -33,14 +52,21 @@ export function openCardViewer(card, from) {
   const cardEl = $('.viewer__card');
   const motionBtn = $('.viewer__motion');
 
-  // Front: the same drawing as in the binder, plus a shine layer
-  const front = $('.viewer__face--front');
-  front.append(createCard(card), makeLayer('viewer__glare'), makeLayer('viewer__holo'));
-  front.firstElementChild.removeAttribute('role');
-  front.firstElementChild.removeAttribute('aria-label');
-  const back = $('.viewer__face--back');
-  back.append(createCardBack(card.back ?? { ...DEFAULT_BACK, text: 'Sample' }), makeLayer('viewer__glare'));
-  dialog.classList.add(`viewer--${finishOf(card)}`);
+  // Each side: the same drawing as elsewhere, plus a shine layer
+  $('.viewer__face--front').append(frontContent, makeLayer('viewer__glare'), makeLayer('viewer__holo'));
+  $('.viewer__face--back').append(backContent, makeLayer('viewer__glare'));
+  dialog.classList.add(`viewer--${finish}`);
+
+  // Extra buttons (e.g. Shake for a badge)
+  const closeBtn = $('.viewer__close');
+  for (const { label, onClick } of buttons) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'viewer__btn';
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    closeBtn.before(btn);
+  }
 
   // ---------- Flip (tap, drag sideways, button, Enter/Space) ----------
   let flipAngle = 0; // 0 = front, 180 = back (any multiple of 180 when resting)
@@ -112,8 +138,10 @@ export function openCardViewer(card, from) {
   let tilt = { x: 0, y: 0 }; // where it is now (eases towards the target)
   let frame = 0;
 
+  let usingMouse = false;
   stage.addEventListener('pointermove', (event) => {
     if (event.pointerType !== 'mouse' || drag) return;
+    usingMouse = true;
     const r = cardEl.getBoundingClientRect();
     target = {
       x: clamp(((event.clientX - r.left) / r.width) * 2 - 1),
@@ -130,6 +158,9 @@ export function openCardViewer(card, from) {
   function onOrientation(event) {
     if (event.beta == null || event.gamma == null) return;
     baseOrientation ??= { beta: event.beta, gamma: event.gamma };
+    // Real gravity: upright phone → down the screen; tilted sideways → sideways
+    const rad = Math.PI / 180;
+    onGravity?.(clamp(Math.sin(event.gamma * rad)), clamp(Math.sin(event.beta * rad)));
     target = {
       x: clamp((event.gamma - baseOrientation.gamma) / 25),
       y: clamp((event.beta - baseOrientation.beta) / 25),
@@ -171,6 +202,7 @@ export function openCardViewer(card, from) {
     frame = 0;
     tilt.x += (target.x - tilt.x) * 0.15;
     tilt.y += (target.y - tilt.y) * 0.15;
+    if (usingMouse) onGravity?.(tilt.x * 0.8, 1); // a computer: down is down, nudged by the mouse
     draw();
     if (Math.abs(target.x - tilt.x) > 0.002 || Math.abs(target.y - tilt.y) > 0.002) startLoop();
   }
@@ -199,6 +231,7 @@ export function openCardViewer(card, from) {
     if (!dialog.open || closing) return;
     closing = true;
     cancelAnimationFrame(frame);
+    onClose?.();
     removeEventListener('deviceorientation', onOrientation);
     let done = false;
     const finish = () => {
