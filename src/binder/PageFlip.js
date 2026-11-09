@@ -12,6 +12,8 @@ import { clamp } from './paging.js';
 const FLIP_MS = 650;
 const DRAG_START_PX = 8; // move this far before a press becomes a drag
 const SWIPE_SPEED = 0.45; // px per ms; a flick this fast turns the page even if it's not past halfway
+const FLICK_WINDOW_MS = 100; // only the last moments before release count towards a flick
+const CLICK_AFTER_DRAG_MS = 500; // the click a browser fires after a drag arrives within this time
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 export class PageFlip {
@@ -146,8 +148,12 @@ export class PageFlip {
   // halfway or you flicked it, otherwise it springs back.
 
   onPointerDown = (event) => {
-    if (this.gesture || !event.isPrimary) return;
+    if (!event.isPrimary) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (this.gesture) {
+      if (this.gesture.dir) return; // already turning a page
+      this.endGesture(); // a press whose release we never saw (e.g. mouse let go outside the window)
+    }
 
     const rect = this.el.getBoundingClientRect();
     this.gesture = {
@@ -176,6 +182,8 @@ export class PageFlip {
       if (Math.abs(dy) > Math.abs(dx)) return this.endGesture();
 
       const dir = this.single ? (dx < 0 ? 1 : -1) : (g.onLeftHalf ? -1 : 1);
+      // On a computer, moving the "wrong" way (e.g. right page dragged right) isn't a page turn
+      if (Math.sign(dx) !== -dir) return this.endGesture();
       if (dir > 0 ? !this.canNext : !this.canPrev) return this.endGesture();
 
       g.dir = dir;
@@ -190,7 +198,7 @@ export class PageFlip {
     event.preventDefault();
     g.dx = dx;
     g.samples.push({ x: event.clientX, t: event.timeStamp });
-    if (g.samples.length > 6) g.samples.shift();
+    while (g.samples.length > 2 && event.timeStamp - g.samples[0].t > FLICK_WINDOW_MS) g.samples.shift();
 
     if (g.leaf) this.setProgress(g.leaf, this.dragProgress(g));
   };
@@ -208,17 +216,14 @@ export class PageFlip {
     if (!g || event.pointerId !== g.id) return;
     this.endGesture();
     if (!g.dir) return; // it was a tap, not a drag
-    this.justDragged = true;
+    this.dragEndedAt = event.timeStamp;
 
-    // Speed in the direction of the turn, from the last few moves
-    const first = g.samples[0];
-    const last = g.samples[g.samples.length - 1];
-    const dt = last && first ? last.t - first.t : 0;
-    const speed = dt > 0 ? (-g.dir * (last.x - first.x)) / dt : 0;
+    const speed = flickSpeed(g, event.timeStamp);
+    const distance = -g.dir * g.dx; // how far the finger moved in the turning direction
 
     if (!g.leaf) {
       // Reduce Motion: a simple swipe, no 3D
-      if (-g.dir * g.dx > 50 || speed > SWIPE_SPEED) {
+      if (distance > 50 || (distance > 0 && speed > SWIPE_SPEED)) {
         this.commit(g.dir);
         this.update();
         this.fade();
@@ -235,27 +240,32 @@ export class PageFlip {
       const target = g.dir > 0 ? 1 : 0;
       this.animate(g.leaf, progress, target, settleTime(1 - amountTurned), easeOut);
     } else {
-      const start = g.dir > 0 ? 0 : 1;
-      this.animate(g.leaf, progress, start, settleTime(amountTurned), easeOut);
+      this.springBack(g);
     }
   };
 
+  // The browser took over the touch (e.g. to scroll): put the page back
   onPointerCancel = (event) => {
     const g = this.gesture;
     if (!g || event.pointerId !== g.id) return;
     this.endGesture();
-    if (g.leaf) {
-      // The system took over the touch (e.g. a call): put the page back
-      const progress = this.dragProgress(g);
-      this.animate(g.leaf, progress, g.dir > 0 ? 0 : 1, settleTime(0.5), easeOut);
-    }
+    if (g.leaf) this.springBack(g);
   };
 
+  springBack(g) {
+    const progress = this.dragProgress(g);
+    const amountTurned = g.dir > 0 ? progress : 1 - progress;
+    this.animate(g.leaf, progress, g.dir > 0 ? 0 : 1, settleTime(amountTurned), easeOut);
+  }
+
   onClickCapture = (event) => {
-    if (!this.justDragged) return;
-    this.justDragged = false;
-    event.stopPropagation();
-    event.preventDefault();
+    if (this.dragEndedAt === undefined) return;
+    const sinceDrag = event.timeStamp - this.dragEndedAt;
+    this.dragEndedAt = undefined;
+    if (sinceDrag >= 0 && sinceDrag < CLICK_AFTER_DRAG_MS) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
   };
 
   endGesture() {
@@ -264,8 +274,6 @@ export class PageFlip {
     removeEventListener('pointercancel', this.onPointerCancel);
     this.el.classList.remove('is-dragging');
     this.gesture = null;
-    // A click only follows a release right away; don't let a stale flag eat a later tap
-    setTimeout(() => { this.justDragged = false; }, 0);
   }
 
   finishRunning() {
@@ -351,6 +359,16 @@ function makeDiv(className) {
   const el = document.createElement('div');
   el.className = className;
   return el;
+}
+
+// How fast the finger was moving in the turning direction just before release (px per ms).
+// Holding still before letting go counts as zero, so a stop-then-release isn't a flick.
+function flickSpeed(g, releaseTime) {
+  const first = g.samples[0];
+  const last = g.samples[g.samples.length - 1];
+  if (!first || releaseTime - last.t > FLICK_WINDOW_MS) return 0;
+  const dt = last.t - first.t;
+  return dt > 0 ? (-g.dir * (last.x - first.x)) / dt : 0;
 }
 
 // Shorter animation when there's less of the turn left to do
