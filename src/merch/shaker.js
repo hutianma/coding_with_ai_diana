@@ -1,5 +1,6 @@
 // 流麻 (shaker) fill: little pieces floating in liquid inside a round badge.
-// They sink slowly with gravity, drift when you tilt the phone, and swirl when shaken.
+// They sink with gravity, each at its own speed, flutter a little as they fall, and
+// scatter in every direction when shaken — like a snow globe.
 // The canvas is square; pieces stay inside the circle.
 
 export const FILLS = [
@@ -9,16 +10,20 @@ export const FILLS = [
   { value: 'stars', name: 'Stars' },
   { value: 'hearts', name: 'Hearts' },
   { value: 'sakura', name: 'Sakura' },
+  { value: 'gold', name: 'Gold dust' },
 ];
 
-// How each fill looks and moves: colors, size range (px on a 600 px badge), how
-// heavy it is in the liquid (1 = sinks normally, lower = floats more)
+// How each fill looks and moves (sizes in px on a 600 px badge):
+//   weight  – how fast it sinks, a range so pieces separate as they fall (1 = normal)
+//   flutter – how much it drifts side to side while falling (snow and petals the most)
 const STYLES = {
-  glitter: { count: 95, size: [13, 24], weight: 1, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
-  snow: { count: 100, size: [8, 20], weight: 0.55, colors: ['#ffffff', '#f2f8ff'] },
-  stars: { count: 44, size: [22, 38], weight: 1.1, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
-  hearts: { count: 44, size: [22, 36], weight: 1.1, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
-  sakura: { count: 40, size: [22, 34], weight: 0.7, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
+  glitter: { count: 95, size: [13, 24], weight: [0.55, 1.3], flutter: 0.035, colors: ['#ffd1ec', '#c9f0ff', '#fff4b8', '#d9ffd6', '#e8d4ff', '#ffffff'] },
+  snow: { count: 100, size: [8, 20], weight: [0.3, 0.75], flutter: 0.06, colors: ['#ffffff', '#f2f8ff'] },
+  stars: { count: 44, size: [22, 38], weight: [0.7, 1.4], flutter: 0.02, colors: ['#ffd84d', '#ffe98f', '#fff3c4'] },
+  hearts: { count: 44, size: [22, 36], weight: [0.7, 1.4], flutter: 0.02, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
+  sakura: { count: 40, size: [22, 34], weight: [0.4, 0.95], flutter: 0.07, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
+  // Fine gold powder: lots of tiny flecks that sparkle and hang in the liquid
+  gold: { count: 320, size: [2.5, 6], weight: [0.2, 0.6], flutter: 0.03, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
 };
 
 const GRAVITY = 0.12; // px per frame²: still liquid, but lively (top to bottom in ~2.5 s)
@@ -48,6 +53,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
   let gravity = { x: 0, y: 1 };
   let frame = 0;
   let quietFrames = 0;
+  let time = 0; // frames simulated, for the flutter
 
   const pieces = !style ? [] : Array.from({ length: style.count }, () => {
     const angle = random() * Math.PI * 2;
@@ -62,43 +68,116 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       rot: random() * Math.PI * 2,
       spin: (random() - 0.5) * 0.06,
       color: style.colors[Math.floor(random() * style.colors.length)],
-      // Lighter pieces sink slower; a little variety looks more natural
-      weight: style.weight * (0.7 + random() * 0.6),
+      // Each piece sinks at its own speed, so a cloud of them spreads out as it falls
+      weight: style.weight[0] + random() * (style.weight[1] - style.weight[0]),
+      // Its own side-to-side drift
+      flutter: style.flutter * (0.5 + random()),
+      freq: 0.03 + random() * 0.05,
+      phase: random() * Math.PI * 2,
     };
   });
 
   function step() {
     let energy = 0;
+    time++;
     for (const p of pieces) {
-      p.vx = (p.vx + (gravity.x * GRAVITY * p.weight + (random() - 0.5) * 0.02) * k) * DRAG;
-      p.vy = (p.vy + (gravity.y * GRAVITY * p.weight + (random() - 0.5) * 0.02) * k) * DRAG;
+      // Drift across the direction of fall (a falling snowflake rocks side to side)
+      const sway = Math.sin(time * p.freq + p.phase) * p.flutter;
+      p.vx = (p.vx + (gravity.x * GRAVITY * p.weight - gravity.y * sway + (random() - 0.5) * 0.03) * k) * DRAG;
+      p.vy = (p.vy + (gravity.y * GRAVITY * p.weight + gravity.x * sway + (random() - 0.5) * 0.03) * k) * DRAG;
       p.x += p.vx;
       p.y += p.vy;
       p.rot += p.spin + p.vx * 0.01;
 
-      // Stay inside the badge: push back to the edge and bounce softly
-      const dx = p.x - center;
-      const dy = p.y - center;
-      const dist = Math.hypot(dx, dy);
-      const max = radius - p.size / 2;
-      if (dist > max) {
-        const nx = dx / dist;
-        const ny = dy / dist;
-        p.x = center + nx * max;
-        p.y = center + ny * max;
-        const along = p.vx * nx + p.vy * ny;
-        if (along > 0) {
-          p.vx -= 1.3 * along * nx;
-          p.vy -= 1.3 * along * ny;
-        }
-      }
       energy += p.vx * p.vx + p.vy * p.vy;
     }
+    separate();
+    for (const p of pieces) keepInside(p); // after separating, which can nudge pieces outwards
     return energy / Math.max(1, pieces.length);
+  }
+
+  // Stay inside the badge: push back to the edge and bounce softly
+  function keepInside(p) {
+    const dx = p.x - center;
+    const dy = p.y - center;
+    const dist = Math.hypot(dx, dy) || 0.01;
+    const max = radius - p.size / 2;
+    if (dist > max) {
+      const nx = dx / dist;
+      const ny = dy / dist;
+      p.x = center + nx * max;
+      p.y = center + ny * max;
+      const along = p.vx * nx + p.vy * ny;
+      if (along > 0) {
+        p.vx -= 1.3 * along * nx;
+        p.vy -= 1.3 * along * ny;
+      }
+    }
+  }
+
+  // Pieces don't pass through each other: overlapping pieces are nudged apart, so they
+  // pile up into a layer at the bottom instead of all sinking to one spot (and a shake
+  // then scatters a whole layer, not a single clump). A grid keeps this quick.
+  const cellSize = Math.max(...pieces.map((p) => p.size), 1);
+  const OVERLAP = fill === 'gold' ? 0.6 : 0.85; // powder can pack tighter
+  function separate() {
+    const grid = new Map();
+    for (const p of pieces) {
+      const key = `${Math.floor(p.x / cellSize)},${Math.floor(p.y / cellSize)}`;
+      let cell = grid.get(key);
+      if (!cell) grid.set(key, (cell = []));
+      cell.push(p);
+    }
+    for (const p of pieces) {
+      const cx = Math.floor(p.x / cellSize);
+      const cy = Math.floor(p.y / cellSize);
+      for (let gx = cx - 1; gx <= cx + 1; gx++) {
+        for (let gy = cy - 1; gy <= cy + 1; gy++) {
+          for (const q of grid.get(`${gx},${gy}`) ?? []) {
+            if (q === p) continue;
+            const dx = q.x - p.x;
+            const dy = q.y - p.y;
+            const min = ((p.size + q.size) / 2) * OVERLAP;
+            const d2 = dx * dx + dy * dy;
+            if (d2 >= min * min) continue;
+            const d = Math.sqrt(d2) || 0.01;
+            const push = (min - d) / 4; // each pair is visited twice
+            const nx = d2 ? dx / d : random() - 0.5;
+            const ny = d2 ? dy / d : random() - 0.5;
+            p.x -= nx * push;
+            p.y -= ny * push;
+            q.x += nx * push;
+            q.y += ny * push;
+          }
+        }
+      }
+    }
+  }
+
+  // Turn the liquid around the middle (clockwise or anticlockwise, picked at random)
+  function swirl(amount) {
+    const dir = random() < 0.5 ? -1 : 1;
+    for (const p of pieces) {
+      const dx = p.x - center;
+      const dy = p.y - center;
+      const r = Math.hypot(dx, dy) / radius;
+      p.vx += -dy / radius * amount * dir * (0.5 + r);
+      p.vy += dx / radius * amount * dir * (0.5 + r);
+    }
+  }
+
+  function limit(p) {
+    const MAX = 30 * k;
+    const speed = Math.hypot(p.vx, p.vy);
+    if (speed > MAX) {
+      p.vx *= MAX / speed;
+      p.vy *= MAX / speed;
+    }
   }
 
   function draw() {
     ctx.clearRect(0, 0, size, size);
+    if (fill === 'gold') return drawDust();
     for (const p of pieces) {
       ctx.save();
       ctx.translate(p.x, p.y);
@@ -107,6 +186,17 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       drawPiece(ctx, fill, p);
       ctx.restore();
     }
+  }
+
+  // Hundreds of tiny flecks: drawn quickly, each glinting as it turns
+  function drawDust() {
+    for (const p of pieces) {
+      ctx.globalAlpha = 0.35 + 0.65 * Math.abs(Math.cos(p.rot * 3));
+      ctx.fillStyle = p.color;
+      const s = p.size;
+      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s * (0.6 + 0.4 * Math.abs(Math.sin(p.rot))));
+    }
+    ctx.globalAlpha = 1;
   }
 
   function loop() {
@@ -144,21 +234,32 @@ export function createShaker(canvas, { fill, seed = 1 }) {
 
     // The badge moved by (dx, dy) canvas pixels: the pieces lag behind, so they're
     // pushed the other way (a little differently each, so they spread out)
+    // Not every piece moves the same way: each also gets a kick in its own random
+    // direction, and the liquid swirls, so they scatter like a shaken snow globe
     push(dx, dy) {
-      const MAX = 30 * k;
+      const strength = Math.hypot(dx, dy) * 0.45;
+      swirl(strength * 0.12);
       for (const p of pieces) {
-        const spread = 0.6 + random() * 0.8;
-        p.vx = Math.max(-MAX, Math.min(MAX, p.vx - dx * 0.45 * spread));
-        p.vy = Math.max(-MAX, Math.min(MAX, p.vy - dy * 0.45 * spread));
+        const along = 0.4 + random() * 1.2;
+        const angle = random() * Math.PI * 2;
+        const kick = strength * random() * 0.9;
+        p.vx += -dx * 0.45 * along + Math.cos(angle) * kick;
+        p.vy += -dy * 0.45 * along + Math.sin(angle) * kick;
+        limit(p);
       }
       this.start();
     },
 
-    // Swirl everything up
-    shake(strength = 6 * k) {
+    // Swirl everything up and out
+    shake(strength = 9 * k) {
+      swirl(strength * 0.15);
       for (const p of pieces) {
-        p.vx += (random() - 0.5) * strength * 2;
-        p.vy += (random() - 0.8) * strength * 2;
+        const angle = random() * Math.PI * 2;
+        const kick = strength * (0.5 + random() * 1.5);
+        const lift = strength * (0.6 + random() * 1.2); // up, against gravity, by a different amount each
+        p.vx += Math.cos(angle) * kick - gravity.x * lift;
+        p.vy += Math.sin(angle) * kick - gravity.y * lift;
+        limit(p);
       }
       this.start();
     },
