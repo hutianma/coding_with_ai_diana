@@ -4,11 +4,12 @@
 // Stores:
 //   cards   – one record per card you made (photos are kept as Blobs)
 //   binders – your binder(s): name, cover color, pages of card ids
+//   merch   – badges and polaroids (added in version 2)
 
 const DB_NAME = 'pocket-fandom';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const OPEN_TIMEOUT_MS = 10000;
-export const STORES = ['cards', 'binders'];
+export const STORES = ['cards', 'binders', 'merch'];
 
 let dbPromise = null;
 
