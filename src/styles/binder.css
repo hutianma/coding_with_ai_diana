@@ -28,50 +28,35 @@
   }
 }
 
-/* ---------- Cover ---------- */
+/* ---------- Cover (the front of leaf 0) ---------- */
 
-.cover {
+.cover-face {
   position: relative;
-  width: calc(var(--page-w) + var(--spine-w));
-  aspect-ratio: 1 / var(--page-ratio);
-  max-height: calc(var(--screen-h) - 32px);
+  flex: none;
+  width: calc(var(--page-w) + 6px);
+  height: 100%;
   border: 0;
   padding: 0;
-  border-radius: 6px 18px 18px 6px;
-  cursor: pointer;
+  border-radius: 4px 18px 18px 4px;
+  cursor: inherit; /* the book's grab cursor */
   font: inherit;
   color: #4a2a3a;
   background: var(--cover-color); /* fallback for older Safari without color-mix */
   background:
     radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.55), transparent 55%),
     linear-gradient(150deg, var(--cover-color), color-mix(in srgb, var(--cover-color) 70%, #8a3d63));
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.1),
-    0 18px 40px -12px rgba(90, 30, 60, 0.45);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: inset 6px 0 10px -6px rgba(0, 0, 0, 0.25);
 }
 
-.cover:hover {
-  transform: translateY(-3px);
-}
-
-.cover:focus-visible {
+.cover-face:focus-visible {
   outline: 3px solid var(--accent);
-  outline-offset: 4px;
+  outline-offset: -6px;
 }
 
-.cover__spine {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--spine-w);
-  border-radius: 6px 0 0 6px;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.04) 70%, rgba(255, 255, 255, 0.25));
-}
-
-.cover__label {
+.cover-face__label {
   position: absolute;
   top: 18%;
-  left: calc(var(--spine-w) + 12%);
+  left: 12%;
   right: 12%;
   display: grid;
   gap: 6px;
@@ -82,20 +67,20 @@
   text-align: center;
 }
 
-.cover__title {
+.cover-face__title {
   font-size: clamp(1.1rem, 4.5vw, 1.6rem);
   font-weight: 700;
 }
 
-.cover__count {
+.cover-face__count {
   font-size: 0.85rem;
   opacity: 0.7;
 }
 
-.cover__hint {
+.cover-face__hint {
   position: absolute;
   bottom: 9%;
-  left: var(--spine-w);
+  left: 0;
   right: 0;
   font-size: 0.85rem;
   letter-spacing: 0.08em;
@@ -107,6 +92,7 @@
 @keyframes pulse {
   50% { opacity: 0.3; }
 }
+
 
 /* ---------- Open binder ---------- */
 
@@ -139,6 +125,11 @@
   color: var(--ink);
   background: var(--chip-bg);
   cursor: pointer;
+}
+
+.toolbar__back[hidden] {
+  display: block;
+  visibility: hidden; /* keep its space so the title stays centered */
 }
 
 .toolbar__title {
@@ -192,9 +183,16 @@
   /* Sideways drags turn pages; up/down scrolling and pinch-zoom still work */
   touch-action: pan-y pinch-zoom;
   cursor: grab;
+  /* --closed: 1 = closed on the cover, 0 = open (set by PageFlip.js while the cover turns) */
+  --closed: 0;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* Computer: a closed binder is just the cover, so slide the book to center it */
+.book:not(.book--single) {
+  transform: translateX(calc(var(--closed) * (var(--page-w) + var(--spine-w) / 2) / -2));
 }
 
 .book.is-dragging {
@@ -240,6 +238,16 @@
   transform-origin: left center;
   transform-style: preserve-3d;
 }
+
+/* The cover is a little bigger than the pages, like a real binder board */
+.leaf--cover {
+  top: -6px;
+  height: calc(100% + 12px);
+  width: calc(var(--page-w) + var(--spine-w) / 2 + 6px);
+}
+
+.leaf--cover .leaf__face--front .leaf__shade { border-radius: 4px 18px 18px 4px; }
+.leaf--cover .leaf__face--back .leaf__shade { border-radius: 18px 4px 4px 18px; }
 
 .book--single .leaf {
   left: calc(var(--spine-w) / 2);
@@ -345,6 +353,14 @@
   color: var(--muted);
 }
 
+/* The inside of the front cover, on the left once the binder is open */
+.leaf__face--back .page--inside {
+  width: calc(var(--page-w) + 6px);
+  border-radius: 18px 4px 4px 18px;
+  background: var(--cover-color);
+  background: color-mix(in srgb, var(--cover-color) 85%, #fff);
+}
+
 /* ---------- Spine and rings ---------- */
 
 .spine {
@@ -377,6 +393,8 @@
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.8),
     0 1px 2px rgba(0, 0, 0, 0.25);
+  /* The rings are hidden inside a closed binder */
+  opacity: calc(1 - var(--closed));
 }
 
 .book--single .ring { transform: translateX(32%); } /* keep rings inside the binder */
@@ -391,14 +409,8 @@
 /* ---------- Reduce Motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .cover,
-  .cover__hint,
+  .cover-face__hint,
   .binder-view {
     animation: none;
-    transition: none;
-  }
-
-  .cover:hover {
-    transform: none;
   }
 }

@@ -6,6 +6,7 @@
 //
 // Computer (two-page) mode: every leaf holds two pages, front and back.
 // Phone (single) mode: every leaf holds one page; turned leaves move off-screen.
+// With `cover: true`, leaf 0 is the binder's front cover and current 0 means "closed".
 
 import { clamp } from './paging.js';
 
@@ -17,11 +18,12 @@ const CLICK_AFTER_DRAG_MS = 500; // the click a browser fires after a drag arriv
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 export class PageFlip {
-  constructor(container, { leafCount, maxCurrent = leafCount, renderFace, single = false, start = 0, coverColor, onChange }) {
+  constructor(container, { leafCount, maxCurrent = leafCount, renderFace, single = false, cover = false, start = 0, coverColor, onChange }) {
     this.leafCount = leafCount;
     this.maxCurrent = maxCurrent;
     this.renderFace = renderFace; // (leafIndex, 'front' | 'back') => Element
     this.single = single;
+    this.cover = cover;
     this.onChange = onChange;
     this.current = clamp(start, 0, maxCurrent);
     this.running = null; // the flip animation in progress, if any
@@ -30,12 +32,14 @@ export class PageFlip {
     this.el.className = `book${single ? ' book--single' : ''}`;
     this.el.style.setProperty('--cover-color', coverColor);
 
-    // Inside of the front and back covers, seen when no page covers them
-    this.el.append(makeDiv('book__base book__base--left'), makeDiv('book__base book__base--right'));
+    // Inside of the back cover (and the front cover, unless the cover is its own leaf),
+    // seen when no page covers it
+    if (!cover) this.el.append(makeDiv('book__base book__base--left'));
+    this.el.append(makeDiv('book__base book__base--right'));
 
     this.leaves = [];
     for (let i = 0; i < leafCount; i++) {
-      const leaf = makeDiv('leaf');
+      const leaf = makeDiv(cover && i === 0 ? 'leaf leaf--cover' : 'leaf');
       leaf.innerHTML = `
         <div class="leaf__face leaf__face--front"><div class="leaf__shade"></div></div>
         <div class="leaf__face leaf__face--back"><div class="leaf__shade"></div></div>
@@ -48,7 +52,8 @@ export class PageFlip {
         back,
         frontShade: front.querySelector('.leaf__shade'),
         backShade: back.querySelector('.leaf__shade'),
-        filled: false,
+        frontContent: null,
+        backContent: null,
       });
       this.el.append(leaf);
     }
@@ -76,6 +81,14 @@ export class PageFlip {
     this.el.addEventListener('pointerdown', this.onPointerDown);
     // After a drag, swallow the click that browsers fire on release (so a drag never "taps" a card)
     this.el.addEventListener('click', this.onClickCapture, true);
+  }
+
+  // Jump straight to a position without animating (e.g. before closing the cover)
+  jumpTo(current) {
+    this.finishRunning();
+    this.current = clamp(current, 0, this.maxCurrent);
+    this.onChange?.(this.current);
+    this.update();
   }
 
   get canNext() { return this.current < this.maxCurrent; }
@@ -293,8 +306,18 @@ export class PageFlip {
 
     // Shadow on the page being uncovered (right side early, left side late)
     const lift = Math.sin(Math.PI * progress);
+    const isCover = this.cover && leaf === this.leaves[0];
     this.shadowRight.style.opacity = lift * (1 - progress);
-    this.shadowLeft.style.opacity = this.single ? 0 : lift * progress;
+    // Nothing lies on the left while the cover opens, so no shadow there
+    this.shadowLeft.style.opacity = this.single || isCover ? 0 : lift * progress;
+
+    // While the cover opens, the binder slides from "closed and centered" to "open"
+    if (isCover) this.setClosed(1 - progress);
+  }
+
+  // 1 = closed (cover centered, rings hidden), 0 = open
+  setClosed(amount) {
+    this.el.style.setProperty('--closed', amount);
   }
 
   // Leaves current-2 … current+1 can be seen during a flip in either direction
@@ -325,20 +348,22 @@ export class PageFlip {
       setInert(leaf.back, !backShown);
     });
     this.shadowLeft.style.opacity = this.shadowRight.style.opacity = 0;
+    this.setClosed(this.cover && this.current === 0 ? 1 : 0);
   }
 
   // Only build page content near the current position, so big binders stay fast
   fillFaces() {
     this.leaves.forEach((leaf, i) => {
       const near = this.isNear(i);
-      if (near && !leaf.filled) {
-        leaf.front.prepend(this.renderFace(i, 'front'));
-        leaf.back.prepend(this.renderFace(i, 'back'));
-        leaf.filled = true;
-      } else if (!near && leaf.filled) {
-        leaf.front.querySelector('.page')?.remove();
-        leaf.back.querySelector('.page')?.remove();
-        leaf.filled = false;
+      if (near && !leaf.frontContent) {
+        leaf.frontContent = this.renderFace(i, 'front');
+        leaf.backContent = this.renderFace(i, 'back');
+        leaf.front.prepend(leaf.frontContent);
+        leaf.back.prepend(leaf.backContent);
+      } else if (!near && leaf.frontContent) {
+        leaf.frontContent.remove();
+        leaf.backContent.remove();
+        leaf.frontContent = leaf.backContent = null;
       }
     });
   }

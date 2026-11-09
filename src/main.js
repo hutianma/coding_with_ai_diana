@@ -4,9 +4,8 @@ import { mountBinder } from './binder/Binder.js';
 
 const app = document.getElementById('app');
 
-// Testing shortcuts: ?open skips the cover, ?page=3 opens at page 3
+// Testing shortcuts: ?open opens at page 1, ?page=3 opens at page 3
 const params = new URLSearchParams(location.search);
-const startOpen = params.has('open') || params.has('page');
-const startPage = Number(params.get('page')) || 1; // rounded and kept in range by mountBinder
+const startPage = Number(params.get('page')) || (params.has('open') ? 1 : 0); // rounded and kept in range by mountBinder
 
-mountBinder(app, createSampleBinder(), { startOpen, startPage });
+mountBinder(app, createSampleBinder(), { startPage });
