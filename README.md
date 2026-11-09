@@ -81,7 +81,7 @@ Each milestone (M#) is one branch, built and reviewed as described in [WORKFLOW.
 | **M3: Drag to flip** | The page follows your finger, snaps or springs back | Feels natural on iPhone | ✅ Done |
 | **M4: Photocard Workshop** | Pick photos → crop to 55:85 → design the back → saved on the device → appears in the binder | Make 6 cards, reload, and they're still in the binder | ✅ Done |
 | **M5: Card effects** | Tap to lift and flip a card, tilt + glare, holo foil | Cards feel like real objects | ✅ Done |
-| **M6: More merch** | Badges with 流麻 fills, polaroids with 合拍 layouts, the My stuff shelf (+ a prettier holo foil) | Make one of each from your photos | ⬜ |
+| **M6: More merch** | Badges with 流麻 fills, polaroids with 合拍 layouts, the My stuff shelf (+ a prettier holo foil) | Make one of each from your photos | ✅ Done |
 | **M7: Decorate** | DIY binder cover, DIY card backs (your own image, stickers), a journal page or ita bag display | A page you'd be proud to show | ⬜ |
 | **M8: Share** | Export images and page-flip videos | Post one to social media straight from the app | ⬜ |
 | **M9: Unboxing mini-game** *(optional)* | Seal cards in an envelope/album, then unbox them | Opening feels like a ritual | ⬜ |
