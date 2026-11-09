@@ -41,7 +41,7 @@ async function start() {
     const hasCards = Object.keys(cards).length > 0;
     let notice = null;
     if (!savingIsAvailable()) {
-      notice = createNotice("This browser isn't letting the app save (private browsing?). Cards you make will disappear when you close the page.");
+      notice = createNotice("Saving isn't working in this browser right now (private browsing?). Cards you make won't be kept. Try reloading the page.");
       notice.classList.add('notice--warning');
     } else if (!hasCards) {
       notice = createNotice('These are sample cards. Tap “＋ New card” to make your own from your photos.');
@@ -71,7 +71,7 @@ async function start() {
   // Save a new or edited card, then show the page it's on
   async function onSave(card, previous) {
     const page = await saveCard(binder, card);
-    if (previous && previous.front !== card.front) releaseImage(previous.front);
+    if (previous) releaseImage(previous.front); // the edited card has a new front image
     cards[card.id] = card;
     show(page);
   }

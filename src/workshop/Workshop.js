@@ -9,7 +9,10 @@ let lastBack = { ...DEFAULT_BACK }; // a batch of new cards starts with the prev
 // Ask for photos, then make a card from each.
 // onSave(card) is called for every finished card and must save it.
 export function pickPhotosForNewCards(onSave) {
+  // A picker that was cancelled last time may still be here
+  document.querySelectorAll('input.photo-picker').forEach((old) => old.remove());
   const input = document.createElement('input');
+  input.className = 'photo-picker';
   input.type = 'file';
   input.accept = 'image/*';
   input.multiple = true;
@@ -19,6 +22,7 @@ export function pickPhotosForNewCards(onSave) {
     input.remove();
     if (files.length) openWorkshop({ files, onSave });
   });
+  input.addEventListener('cancel', () => input.remove());
   document.body.append(input);
   input.click();
 }
@@ -106,26 +110,29 @@ export function openWorkshop({ files, existing = null, onSave }) {
   let crop = { ...DEFAULT_CROP };
   let back = existing ? { ...existing.back } : { ...lastBack };
   let previewUrl = null;
+  let preview = null; // { blob, cropKey }: the front drawn for the back step, reused when saving
+  let skipped = 0; // photos that couldn't be opened
   let busy = false;
 
   // ---------- Steps ----------
 
   async function showPhoto(i) {
     index = i;
-    showError('');
     setBusy(true);
     unloadImage(image);
     image = null;
     try {
       image = await loadImage(files[i]);
-    } catch (err) {
+    } catch {
       setBusy(false);
-      showError(err.message);
-      // Skip a photo that can't be opened
+      skipped++;
+      // Skip a photo that can't be opened, and say so
       if (i + 1 < files.length) return showPhoto(i + 1);
+      showNothingLeft();
       return;
     }
     setBusy(false);
+    showError(skipped ? `${skipped} photo${skipped > 1 ? 's' : ''} couldn't be opened and ${skipped > 1 ? 'were' : 'was'} skipped. Try JPEG or PNG.` : '');
     crop = existing?.crop ? { ...existing.crop } : { ...DEFAULT_CROP };
     cropImg.src = image.src;
     showStep('crop');
@@ -147,6 +154,16 @@ export function openWorkshop({ files, existing = null, onSave }) {
       primary.textContent = index + 1 < files.length ? 'Save & next' : 'Save card';
       drawBackStep();
     }
+  }
+
+  // Every remaining photo failed to open: explain, and only offer Close
+  function showNothingLeft() {
+    dialog.querySelectorAll('.workshop__step').forEach((s) => { s.hidden = true; });
+    title.textContent = existing ? 'Edit card' : 'New card';
+    showError(`${skipped > 1 ? 'These photos' : 'This photo'} couldn't be opened. Try a JPEG or PNG.`);
+    primary.hidden = true;
+    secondary.textContent = 'Close';
+    step = 'none';
   }
 
   function frameSize() {
@@ -186,8 +203,10 @@ export function openWorkshop({ files, existing = null, onSave }) {
     // A preview of the front, drawn the same way it will be saved
     const token = ++previewToken;
     frontPreview.removeAttribute('src');
+    const cropKey = JSON.stringify(crop);
     const blob = await renderCardFront(image, crop);
     if (token !== previewToken) return; // a newer preview has started
+    preview = { blob, cropKey };
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = URL.createObjectURL(blob);
     frontPreview.src = previewUrl;
@@ -201,8 +220,9 @@ export function openWorkshop({ files, existing = null, onSave }) {
     setBusy(true);
     showError('');
     try {
+      const reuse = preview?.cropKey === JSON.stringify(crop);
       const [front, source] = await Promise.all([
-        renderCardFront(image, crop),
+        reuse ? preview.blob : renderCardFront(image, crop),
         existing ? existing.source : shrinkSource(image),
       ]);
       const card = {
@@ -257,7 +277,9 @@ export function openWorkshop({ files, existing = null, onSave }) {
     if (step === 'back') showStep('crop');
     else close();
   });
-  $('.workshop__close').addEventListener('click', close);
+  $('.workshop__close').addEventListener('click', () => {
+    if (!busy) close();
+  });
   dialog.addEventListener('cancel', (event) => {
     event.preventDefault(); // Esc: close the same way as the ✕ button
     if (!busy) close();

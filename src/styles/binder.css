@@ -1,7 +1,8 @@
 /* ---------- Sizes ----------
    A 2×2 page is about 1.45× taller than it is wide.
    --page-w is the largest page width that fits the screen. It's worked out on
-   .binder-view so that a notice above the binder (more --chrome-h) shrinks the pages. */
+   .binder-view so that a notice above the binder (--notice-h, measured in Binder.js)
+   shrinks the pages. */
 
 :root {
   --spine-w: 34px;
@@ -22,8 +23,6 @@
   );
 }
 
-.binder-view:has(> .notice) { --notice-h: 48px; }
-
 /* Phones: one page at a time */
 @media (max-width: 700px) {
   :root { --spine-w: 26px; }
@@ -34,8 +33,6 @@
       (var(--screen-h) - var(--chrome-h) - var(--notice-h)) / var(--page-ratio)
     );
   }
-
-  .binder-view:has(> .notice) { --notice-h: 84px; }
 }
 
 /* ---------- Cover (the front of leaf 0) ---------- */

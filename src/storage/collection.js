@@ -2,6 +2,7 @@
 // Wraps db.js with the rules for where new cards go.
 import { getAll, get, writeMany } from './db.js';
 import { makeId } from './ids.js';
+import { emptySlots } from '../binder/layout.js';
 
 const BINDER_ID = 'mine';
 
@@ -16,11 +17,12 @@ export function newBinder() {
 }
 
 function emptyPage(layout) {
-  return { id: makeId('page'), slots: Array(slotsPerPage(layout)).fill(null) };
+  return { id: makeId('page'), slots: emptySlots(layout) };
 }
 
-function slotsPerPage(layout) {
-  return layout === '3x3' ? 9 : 4;
+// A copy of the binder's pages to change, so nothing changes if saving fails
+function copyPages(binder) {
+  return binder.pages.map((page) => ({ ...page, slots: [...page.slots] }));
 }
 
 // Load everything. Returns { binder, cards } where cards is { id: card }, or a
@@ -56,22 +58,26 @@ export function placeInNextPocket(binder, cardId) {
 // Save a new or edited card. New cards go into the next empty pocket.
 // Returns the page number the card is on.
 export async function saveCard(binder, card) {
-  let pageNumber = binder.pages.findIndex((page) => page.slots.includes(card.id)) + 1;
-  if (!pageNumber) pageNumber = placeInNextPocket(binder, card.id);
+  const next = { ...binder, pages: copyPages(binder) };
+  let pageNumber = next.pages.findIndex((page) => page.slots.includes(card.id)) + 1;
+  if (!pageNumber) pageNumber = placeInNextPocket(next, card.id);
   await writeMany([
     { store: 'cards', value: card },
-    { store: 'binders', value: binder },
+    { store: 'binders', value: next },
   ]);
+  binder.pages = next.pages; // only once it's safely saved
   return pageNumber;
 }
 
 // Delete a card and empty its pocket
 export async function deleteCard(binder, cardId) {
-  for (const page of binder.pages) {
-    page.slots = page.slots.map((id) => (id === cardId ? null : id));
-  }
+  const pages = copyPages(binder).map((page) => ({
+    ...page,
+    slots: page.slots.map((id) => (id === cardId ? null : id)),
+  }));
   await writeMany([
-    { store: 'binders', value: binder },
+    { store: 'binders', value: { ...binder, pages } },
     { store: 'cards', deleteId: cardId },
   ]);
+  binder.pages = pages; // only once it's safely saved
 }

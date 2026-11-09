@@ -45,7 +45,12 @@ export function openMyCards({ cards, onEdit, onDelete }) {
       });
       item.querySelector('[data-action="delete"]').addEventListener('click', async () => {
         if (!confirm(`Delete "${name}"? This can't be undone.`)) return;
-        await onDelete(card);
+        try {
+          await onDelete(card);
+        } catch (err) {
+          alert(`Couldn't delete this card. ${err.message ?? ''}`.trim());
+          return;
+        }
         draw();
       });
       return item;

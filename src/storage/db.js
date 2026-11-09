@@ -7,13 +7,15 @@
 
 const DB_NAME = 'pocket-fandom';
 const DB_VERSION = 1;
-const OPEN_TIMEOUT_MS = 4000;
+const OPEN_TIMEOUT_MS = 10000;
 export const STORES = ['cards', 'binders'];
 
 let dbPromise = null;
 
-// Some browsers (e.g. certain private-browsing modes) don't allow saving. Then we keep
-// everything in memory instead, so the app still works, and say that cards won't be kept.
+// If the browser won't let us save (some private-browsing modes, or the database never
+// answers), we keep everything in memory instead, so the app still works, and the app
+// says that cards won't be kept. A database that's busy in another tab is an error instead,
+// so saved cards are never hidden behind memory mode.
 let memory = null; // { storeName: Map(id → record) } when saving isn't available
 
 export function savingIsAvailable() {
@@ -24,7 +26,11 @@ function openDb() {
   dbPromise ??= Promise.race([
     openIndexedDb(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), OPEN_TIMEOUT_MS)),
-  ]).catch(() => {
+  ]).catch((err) => {
+    if (err.name === 'BlockedError') {
+      dbPromise = null; // let a reload try again
+      throw err;
+    }
     memory = Object.fromEntries(STORES.map((name) => [name, new Map()]));
     return null;
   });
@@ -44,7 +50,11 @@ function openIndexedDb() {
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('The database is open in another tab. Close it and try again.'));
+    request.onblocked = () => {
+      const err = new Error('Pocket Fandom is open in another tab. Close the other tab and reload.');
+      err.name = 'BlockedError';
+      reject(err);
+    };
   });
 }
 

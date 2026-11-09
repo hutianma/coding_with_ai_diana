@@ -1,6 +1,7 @@
 import { createPage, createBlankPage } from './Sleeve.js';
 import { PageFlip } from './PageFlip.js';
 import { createPaging, pageLabel, clamp } from './paging.js';
+import { emptySlots } from './layout.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
@@ -136,6 +137,7 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
     // Leave shortcuts like Cmd+← (browser Back) and keys used elsewhere alone
     if (event.defaultPrevented || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
     if (event.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    if (document.querySelector('dialog[open]')) return; // a window is open on top of the binder
     if (event.key === 'ArrowRight') flip.next();
     if (event.key === 'ArrowLeft') flip.prev();
   }
@@ -143,15 +145,27 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   phoneQuery.addEventListener('change', buildBook);
 
   view.append(toolbar);
-  if (notice) view.append(notice);
+  let noticeObserver = null;
+  if (notice) {
+    view.append(notice);
+    // The pages shrink to make room for the notice, however many lines it wraps to
+    noticeObserver = new ResizeObserver(measureNotice);
+    noticeObserver.observe(notice);
+  }
   view.append(stage, nav);
+
+  function measureNotice() {
+    view.style.setProperty('--notice-h', `${notice.offsetHeight + 12}px`);
+  }
   root.replaceChildren(view);
+  if (notice) measureNotice(); // right away, so the first drawing is already the right size
   buildBook();
 
   return {
     // The page being looked at (0 = cover)
     get page() { return focusPage; },
     destroy() {
+      noticeObserver?.disconnect();
       document.removeEventListener('keydown', onKey);
       phoneQuery.removeEventListener('change', buildBook);
       flip?.destroy();
@@ -161,7 +175,7 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
 }
 
 function emptyPage(layout) {
-  return { id: 'empty', slots: Array(layout === '3x3' ? 9 : 4).fill(null) };
+  return { id: 'empty', slots: emptySlots(layout) };
 }
 
 // The inside of the front cover (seen on the left once the binder is open)
