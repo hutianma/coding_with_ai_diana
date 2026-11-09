@@ -1,6 +1,6 @@
 # 🛠️ Build Workflow
 
-How we build **Pocket Album World** step by step. [README.md](README.md) says **what** we're building. This file says **how** we build it, one milestone at a time.
+How we build **Pocket Fandom** step by step. [README.md](README.md) says **what** we're building. This file says **how** we build it, one milestone at a time.
 
 ---
 
@@ -82,54 +82,51 @@ A milestone is finished only when **all** of these are true:
 3. Sideways drags turn pages; up/down scrolling and pinch-zoom still work (`touch-action: pan-y pinch-zoom`).
 4. ✅ **Check:** on the iPhone, dragging feels like a real page.
 
-### M4: Card Maker
+### M4: Photocard Workshop
 1. "New card" button → photo picker (`<input type="file" accept="image/*" multiple>`).
 2. Crop screen locked to the 55:85 ratio (drag and pinch to frame the photo).
 3. Card back designer: color, pattern, short text (or a second photo).
 4. Make smaller copies (about 600 px tall) and save cards to **IndexedDB** (`src/storage/db.js`).
-5. A "My cards" list to view, edit and delete cards.
-6. ✅ **Check:** make 6 cards, reload the page, and they're all still there.
+5. New cards go into the binder's next empty pockets; the placeholder cards go away once you have your own.
+6. A "My cards" list to edit and delete cards.
+7. ✅ **Check:** make 6 cards, reload the page, and they're still in the binder.
 
-### M5: Album Studio v1
-1. New album: title, cover photo, colors, font.
-2. Sticker layer on the cover: drag on, resize, rotate, delete.
-3. Templates: **envelope** and **CD case** first (gift box and blind box come in Phase 2).
-4. Choose the album's 6 cards, plus an optional hidden card.
-5. 3D preview of the finished package (spin it around).
-6. Save as an `Album` + `CoverDesign` (editable later, not a flat image).
-7. ✅ **Check:** design an album, reload the page, and edit it again.
-
-### M6: Virtual Unboxing v1
-1. Unboxing scene: the package sits in front of you.
-2. **Peel the shrink-wrap** by dragging from a corner.
-3. **Open** the envelope flap or CD case lid (CSS 3D hinge).
-4. **Flip through the photobook** (reuses `PageFlip.js`), with the hidden card tucked between pages.
-5. **Random drop:** pick 2 cards from the album (weights by rarity), cards slide out face-down, tap or drag to flip and reveal.
-6. Sound effects + vibration where supported; Reduce Motion gets simple fades.
-7. ✅ **Check:** opening an album feels like a ritual, not a button.
-
-### M7: Collection loop
-1. Unboxed cards become `CardInstance`s and go into the binder's next empty pockets.
-2. Drag cards between pockets; long-press to remove.
-3. Set page for each album: collected cards in color, missing ones as silhouettes, duplicates counter.
-4. "Open another" button to unbox again.
-5. ✅ **Check:** the whole loop works end to end: 6 photos → album → unbox 2 cards → binder → see what's missing.
-
-### M8: Card effects
+### M5: Card effects
 1. Tap a card → it lifts out of the pocket → flip it to see the back.
 2. **Tilt + glare:** mouse on computers, gyroscope on phones (with an "Enable motion" button for iOS).
-3. **Holo foil** for holo cards.
-4. Only the card in focus is animated; Reduce Motion shows a still image.
-5. ✅ **Check:** tilting the phone clearly changes the card, and the app stays smooth.
+3. **Holo foil** for cards whose finish is `"holo"`.
+4. Handwritten **signature** drawn with a finger, shown on the card.
+5. Only the card in focus is animated; Reduce Motion shows a still image.
+6. ✅ **Check:** tilting the phone clearly changes the card, and the app stays smooth.
 
-### M9: Playtest
-1. Write a short playtest script: what to try, and 5 questions (Was unboxing fun? Would you open another? What was confusing?).
-2. 3–5 friends play the loop on their phones; note what they say and where they get stuck.
-3. Turn the feedback into small fixes and decide what Phase 2 focuses on.
-4. ✅ **Check:** we know whether unboxing is fun, and what to change.
+### M6: More merch
+1. **Badge:** round crop + glossy dome effect.
+2. **Polaroid:** white frame + handwritten caption.
+3. **Acrylic stand:** cut out the subject on the device, put it on a clear base.
+4. A shelf view to see all your merch.
+5. ✅ **Check:** make one of each from your own photos.
 
-### Phase 2–4
-Each phase is split into milestones (M10, M11, …) when we get there, following the README's Phase 2–4 table. **Each one is its own branch.**
+### M7: Decorate
+1. DIY binder cover: material, color, photo window, stickers.
+2. Sticker layer: drag on, resize, rotate, delete.
+3. A journal page **or** an ita bag display (Diana picks which first).
+4. Saved as editable settings, not flat images.
+5. ✅ **Check:** decorate a page, reload, and edit it again.
+
+### M8: Share
+1. Export the current binder spread / journal page / ita bag as a PNG.
+2. Export a short page-flip video (WebM/MP4 via `MediaRecorder`) or GIF.
+3. Share sheet on phones (`navigator.share`), download on computers.
+4. ✅ **Check:** post one export to social media straight from the phone.
+
+### M9: Unboxing mini-game (optional)
+1. Seal chosen cards in an envelope or album.
+2. Peel the shrink-wrap, open the flap or lid, flip through, reveal the cards one by one.
+3. Sound effects + vibration where supported; Reduce Motion gets simple fades.
+4. ✅ **Check:** opening feels like a ritual, not a button.
+
+### After Phase 1
+Check the signals in the README ("How we'll know Phase 1 works"). Then pick the next steps from the README's "Later" table and split them into milestones (M10, M11, …). **Each one is its own branch.**
 
 ---
 
