@@ -74,7 +74,7 @@ function check(name, ok, extra = '') {
     let r = rect(), cx = r.left + r.width * 0.75, cy = r.top + r.height / 2, w = r.width;
 
     await drag(cx, cy, -w * 0.5, 0, { release: false });
-    check('phone: page follows the finger mid-drag', angleOf(0) < -60 && angleOf(0) > -120, 'angle ' + angleOf(0));
+    check('phone: page follows the finger mid-drag', angleOf(1) < -60 && angleOf(1) > -120, 'angle ' + angleOf(1));
     check('phone: page counter waits until release', label() === 'Page 1 of 4', label());
     await wait(150); pointer('pointerup', cx - w * 0.5, cy); await wait(600);
 
@@ -84,7 +84,7 @@ function check(name, ok, extra = '') {
 
     await load(390, 844, 'open');
     await drag(cx, cy, -w * 0.3, 0);
-    check('phone: short drag springs back', label() === 'Page 1 of 4' && angleOf(0) === 0, label() + ' angle ' + angleOf(0));
+    check('phone: short drag springs back', label() === 'Page 1 of 4' && angleOf(1) === 0, label() + ' angle ' + angleOf(1));
 
     await load(390, 844, 'open');
     await flick(cx, cy, -w * 0.2);
@@ -96,11 +96,18 @@ function check(name, ok, extra = '') {
 
     await load(390, 844, 'open');
     await drag(r.left + w * 0.3, cy, w * 0.7, 0);
-    check('phone: drag right on first page does nothing', label() === 'Page 1 of 4' && angleOf(0) === 0, label());
+    check('phone: drag right on page 1 closes the cover', label() === 'Cover', label());
+
+    await drag(r.left + w * 0.3, cy, w * 0.7, 0);
+    check('phone: drag right on the cover does nothing', label() === 'Cover' && angleOf(0) === 0, label());
+
+    await load(390, 844, '');
+    await drag(cx, cy, -w * 0.7, 0);
+    check('phone: drag the cover open', label() === 'Page 1 of 4', label());
 
     await load(390, 844, 'open');
     await drag(cx, cy, -10, -200);
-    check('phone: up/down drag does not turn', label() === 'Page 1 of 4' && angleOf(0) === 0, label());
+    check('phone: up/down drag does not turn', label() === 'Page 1 of 4' && angleOf(1) === 0, label());
 
     await load(390, 844, 'open');
     let clicks = 0;
@@ -151,8 +158,15 @@ function check(name, ok, extra = '') {
     check('computer: drag left page rightwards → previous spread', label() === 'Page 1 of 4', label());
 
     await drag(r.left + r.width * 0.15, cy, page, 0);
-    check('computer: dragging the empty left side on page 1 does nothing', label() === 'Page 1 of 4', label());
+    check('computer: dragging the inside cover rightwards closes the binder', label() === 'Cover', label());
 
+    await load(1280, 800, '');
+    r = rect(); cy = r.top + r.height / 2;
+    await drag(r.left + r.width * 0.85, cy, -page, 0);
+    check('computer: drag the cover open', label() === 'Page 1 of 4', label());
+
+    await load(1280, 800, 'open');
+    r = rect(); cy = r.top + r.height / 2;
     clicks = 0;
     book.addEventListener('click', () => clicks++);
     const rx = r.left + r.width * 0.85;
