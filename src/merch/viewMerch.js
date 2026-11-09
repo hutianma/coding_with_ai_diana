@@ -10,6 +10,8 @@ export function openMerchViewer(item, from) {
     const front = createBadge(item, { live: !reducedMotion.matches });
     const shaker = front.shaker; // only badges with a 流麻 fill
     shaker?.start(); // the pieces keep sinking after you pick it up
+    // Screen px → the fill's canvas px (the canvas is bigger than the badge on screen)
+    const toCanvas = () => front.querySelector('.badge__fill').width / front.getBoundingClientRect().width;
     return openViewer({
       name: badgeName(item),
       shape: 'badge',
@@ -17,6 +19,8 @@ export function openMerchViewer(item, from) {
       back: createBadgeBack(item),
       from,
       onGravity: shaker ? (x, y) => shaker.setGravity(x, y) : null,
+      onShake: shaker ? (dx, dy) => shaker.push(dx * toCanvas(), dy * toCanvas()) : null,
+      dragShakes: Boolean(shaker), // drag the badge around to slosh the pieces (tap or Flip turns it over)
       buttons: shaker ? [{ label: 'Shake ✨', onClick: () => shaker.shake() }] : [],
       onClose: () => shaker?.stop(),
     });

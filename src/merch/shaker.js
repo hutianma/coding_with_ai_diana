@@ -129,11 +129,29 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       draw();
     },
 
+    // Run a number of physics steps right away, then draw (used by tests)
+    advance(steps = 1) {
+      for (let i = 0; i < steps; i++) step();
+      draw();
+    },
+
     // Which way is "down" (x, y between -1 and 1; y = 1 is straight down the screen)
     setGravity(x, y) {
       const changed = Math.abs(x - gravity.x) + Math.abs(y - gravity.y) > 0.01;
       gravity = { x, y };
       if (changed) this.start();
+    },
+
+    // The badge moved by (dx, dy) canvas pixels: the pieces lag behind, so they're
+    // pushed the other way (a little differently each, so they spread out)
+    push(dx, dy) {
+      const MAX = 22 * k;
+      for (const p of pieces) {
+        const spread = 0.6 + random() * 0.8;
+        p.vx = Math.max(-MAX, Math.min(MAX, p.vx - dx * 0.45 * spread));
+        p.vy = Math.max(-MAX, Math.min(MAX, p.vy - dy * 0.45 * spread));
+      }
+      this.start();
     },
 
     // Swirl everything up
