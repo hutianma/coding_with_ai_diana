@@ -167,6 +167,33 @@ try {
   await until(() => !doc.querySelector('dialog.workshop[open]')); await wait(300);
   const edited = visibleCards()[0];
   check('saved: no signature, matte finish', edited && !edited.querySelector('.card__signature') && edited.classList.contains('card--matte'), edited?.className);
+
+  // ---------- A batch where you don't move the crop keeps each photo ----------
+  doc.querySelector('[data-action="new"]').click();
+  const input3 = doc.querySelector('input[type=file]');
+  const dt3 = new win.DataTransfer();
+  for (const hue of [0, 120]) dt3.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));
+  input3.files = dt3.files; input3.dispatchEvent(new win.Event('change'));
+  for (let i = 0; i < 2; i++) {
+    await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0 && title().startsWith('New card'));
+    await wait(100);
+    doc.querySelector('.workshop__primary').click(); await wait(300); // crop untouched → sign
+    doc.querySelector('.workshop__primary').click(); await wait(600); // skip signing → back
+    doc.querySelector('.workshop__primary').click(); // save
+    await until(() => !doc.querySelector('dialog.workshop[open]') || title() === 'New card (2 of 2)');
+  }
+  await until(() => !doc.querySelector('dialog.workshop[open]')); await wait(300);
+  // Read the middle pixel of each saved card's photo
+  const hueOf = (img) => {
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const [r, gr, b] = g.getImageData(c.width / 2, c.height / 2, 1, 1).data;
+    return r > gr ? 'red' : 'green';
+  };
+  const photos = [...doc.querySelectorAll('.card__photo')];
+  await until(() => photos.every((p) => p.complete && p.naturalWidth));
+  const hues = photos.slice(-2).map(hueOf);
+  check('2 cards in a row with untouched crops each keep their own photo', hues.join() === 'red,green', hues.join());
 } catch (e) {
   results.push('ERROR ' + e.stack);
 }
