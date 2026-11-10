@@ -1,9 +1,9 @@
-// Faux fur, drawn strand by strand: thousands of slightly curved hairs in lighter and
-// darker shades of the cover color, mostly lying the same way (like brushed fur), on a
-// tile that repeats seamlessly. Made once per color and then reused.
+// Faux fur, drawn strand by strand: thousands of short, soft hairs in lighter and darker
+// shades of the cover color, lying loosely the same way (like a plush toy), on a tile
+// that repeats seamlessly. Made once per color and then reused.
 
 const TILE = 256; // px (shown at half size, so it stays sharp on phone screens)
-const HAIRS = 3200;
+const HAIRS = 5600; // short hairs, so more of them to keep the fur thick
 const cache = new Map();
 
 export function furTexture(color) {
@@ -14,26 +14,26 @@ export function furTexture(color) {
   const base = parseColor(color);
   const random = seeded(hash(color));
 
-  ctx.fillStyle = shade(base, -0.18);
+  ctx.fillStyle = shade(base, -0.07);
   ctx.fillRect(0, 0, TILE, TILE);
   ctx.lineCap = 'round';
 
   // Back to front: dark undercoat first, then mid tones, then light tips on top
   const layers = [
-    { count: HAIRS * 0.35, light: [-0.3, -0.12], alpha: [0.5, 0.8], width: [1.4, 2.2] },
-    { count: HAIRS * 0.4, light: [-0.08, 0.1], alpha: [0.45, 0.75], width: [1.1, 1.8] },
-    { count: HAIRS * 0.25, light: [0.15, 0.4], alpha: [0.35, 0.7], width: [0.8, 1.3] },
+    { count: HAIRS * 0.3, light: [-0.15, -0.04], alpha: [0.45, 0.75], width: [1.6, 2.4] },
+    { count: HAIRS * 0.4, light: [0, 0.16], alpha: [0.45, 0.75], width: [1.3, 2] },
+    { count: HAIRS * 0.3, light: [0.22, 0.5], alpha: [0.4, 0.75], width: [1, 1.6] },
   ];
   for (const layer of layers) {
     for (let i = 0; i < layer.count; i++) {
       const x = random() * TILE;
       const y = random() * TILE;
-      // Hairs lie mostly downwards and a little to the right, with a gentle wave
-      // across the tile, so the fur looks brushed rather than random
+      // Hairs lie loosely downwards with a gentle wave across the tile: short and a bit
+      // tousled, so it looks soft and plush rather than long and brushed
       const flow = Math.sin((x / TILE) * Math.PI * 2) * 0.35 + Math.cos((y / TILE) * Math.PI * 2) * 0.2;
-      const angle = Math.PI / 2 - 0.35 + flow + (random() - 0.5) * 0.7;
-      const length = 12 + random() * 16;
-      const bend = (random() - 0.5) * 8;
+      const angle = Math.PI / 2 - 0.35 + flow + (random() - 0.5) * 1.2;
+      const length = 4 + random() * 5;
+      const bend = (random() - 0.5) * 4;
       const light = layer.light[0] + random() * (layer.light[1] - layer.light[0]);
       ctx.strokeStyle = shade(base, light);
       ctx.globalAlpha = layer.alpha[0] + random() * (layer.alpha[1] - layer.alpha[0]);
