@@ -1,0 +1,219 @@
+<!--
+  Automated card sleeve tests (M9): drawing each kind of sleeve, making one in the app,
+  picking it up, editing it, putting it on a journal page, and deleting.
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/sleeve-test.html  → every line should say PASS.
+  Uses made-up test pictures, never real photos. Runs with ?memory (no saved data touched).
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Card sleeve tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script type="module">
+import { createCardSleeve, sleeveOf, sleeveRatio, newSleeve, startColor, STYLES, ANIMALS } from '/src/merch/CardSleeve.js';
+import { createCharmSwing } from '/src/merch/charmSwing.js';
+import { deleteCard } from '/src/storage/collection.js';
+
+const out = document.getElementById('out');
+const results = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+let win, doc;
+
+async function until(test, ms = 8000) {
+  for (let t = 0; t < ms; t += 50) { if (test()) return true; await wait(50); }
+  return false;
+}
+
+function testPicture(hue) {
+  const c = document.createElement('canvas'); c.width = 900; c.height = 1300;
+  const g = c.getContext('2d'); g.fillStyle = `hsl(${hue} 80% 50%)`; g.fillRect(0, 0, 900, 1300);
+  return new Promise((r) => c.toBlob((b) => r(new File([b], 'p.png', { type: 'image/png' })), 'image/png'));
+}
+
+async function givePhoto(hue) {
+  await until(() => doc.querySelector('input.photo-picker'));
+  const input = doc.querySelector('input.photo-picker');
+  const dt = new win.DataTransfer();
+  dt.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));
+  input.files = dt.files;
+  input.dispatchEvent(new win.Event('change'));
+}
+
+async function makeCard(hue) {
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
+  await givePhoto(hue);
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  for (let i = 0; i < 3; i++) { doc.querySelector('dialog[open] .workshop__primary').click(); await wait(400); }
+  await until(() => !doc.querySelector('dialog[open]'));
+}
+
+const editor = () => doc.querySelector('dialog.sleeve-editor[open]');
+const shelf = () => doc.querySelector('dialog.my-cards[open]');
+const pick = (name, value) => doc.querySelector(`dialog.sleeve-editor input[name="${name}"][value="${value}"]`).click();
+const previewSleeve = () => doc.querySelector('.sleeve-editor__preview .card-sleeve');
+
+try {
+  // ---------- Drawing ----------
+  const card = { id: 'c', front: new Blob(), back: { color: '#fff', pattern: 'plain', text: '' } };
+  for (const style of STYLES) {
+    const el = createCardSleeve({ kind: 'sleeve', style: style.value, charm: 'star' }, card);
+    const slot = el.querySelector('.card-sleeve__card');
+    check(`${style.name}: the card sits inside, with a charm`, el.classList.contains(`card-sleeve--${style.value}`) && !!slot.querySelector('.card')
+      && parseFloat(slot.style.width) > 60 && !!el.querySelector('.card-sleeve__charm svg'));
+  }
+  const fox = createCardSleeve({ kind: 'sleeve', style: 'plush', animal: 'fox', charm: 'none' }, card);
+  check('plush animals have a face and fuzzy fur', fox.classList.contains('card-sleeve--fox') && !!fox.querySelector('.card-sleeve__eye')
+    && /data:image\/png/.test(fox.style.getPropertyValue('--fur')) && !fox.querySelector('.card-sleeve__charm'));
+  const back = createCardSleeve({ kind: 'sleeve', style: 'plush', animal: 'bear', charm: 'heart' }, card, { side: 'back' });
+  check('the back of a plush sleeve has no window, card or face', !back.querySelector('.card-sleeve__card') && !back.querySelector('.card-sleeve__window') && !back.querySelector('.card-sleeve__eye'));
+  const topBack = createCardSleeve({ kind: 'sleeve', style: 'toploader' }, card, { side: 'back' });
+  check('the back of a clear toploader shows the card\'s back', !!topBack.querySelector('.card-sleeve__card .card-back'));
+  const odd = sleeveOf({ kind: 'sleeve', style: 'nope', charm: 'nope', color: 'red' });
+  check('unknown settings fall back to a plain toploader', odd.style === 'toploader' && odd.charm === 'none' && /^#/.test(odd.color));
+  check('a fox starts orange, a puppy white', startColor('plush', 'fox') === ANIMALS[1].color && startColor('plush', 'puppy') === '#fbf8f4');
+  check('a plush sleeve is taller than a toploader (ears and face)', sleeveRatio({ style: 'plush' }) < sleeveRatio({ style: 'toploader' }));
+  const stuck = createCardSleeve({ ...newSleeve('c'), stickers: [{ id: 's', kind: 'builtin', name: 'star', x: 0.5, y: 0.5, scale: 1, rotation: 0 }] }, card);
+  check('stickers are drawn on the sleeve', stuck.querySelectorAll('.card-sleeve__stickers .sticker').length === 1);
+  const empty = createCardSleeve(newSleeve('gone'), undefined);
+  check('a sleeve whose card is missing is drawn empty', !!empty.querySelector('.card-sleeve__card--empty'));
+
+  // The charm swings towards "down" and settles
+  window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16); // headless browsers may not run frames
+  const charmEl = document.createElement('div');
+  const swing = createCharmSwing([charmEl]);
+  swing.setGravity(-1, 0.2); // down is to the left: it swings that way (clockwise)
+  await wait(1500);
+  check('the charm hangs the way down is', parseFloat(charmEl.style.getPropertyValue('--swing')) > 40, charmEl.style.getPropertyValue('--swing'));
+  swing.stop();
+
+  // Deleting a card deletes its sleeves too (and takes them off journal pages)
+  const binder = { id: 'test', pages: [{ id: 'p', slots: ['k1', null] }, { id: 'j', kind: 'journal', items: [{ kind: 'merch', merchId: 's1' }, { kind: 'merch', merchId: 's2' }] }] };
+  await deleteCard(binder, 'k1', ['s1']);
+  check('deleting a card takes its sleeve off journal pages', binder.pages[0].slots[0] === null && binder.pages[1].items.length === 1 && binder.pages[1].items[0].merchId === 's2');
+
+  // ---------- In the app ----------
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?memory&open'; });
+  win = f.contentWindow; doc = win.document;
+  win.requestAnimationFrame = (cb) => setTimeout(() => cb(win.performance.now()), 16);
+  win.cancelAnimationFrame = (id) => clearTimeout(id);
+  win.confirm = () => true;
+  await until(() => doc.querySelector('.book'), 20000);
+
+  // Without cards, the editor says to make one first and can't save
+  doc.querySelector('[data-action="new"]').click(); await wait(100);
+  check('＋ New offers a card sleeve', !!doc.querySelector('.make-menu [data-make="sleeve"]'));
+  doc.querySelector('[data-make="sleeve"]').click();
+  await until(() => editor());
+  check('with no photocards, it asks for one first', /Make a photocard first/.test(editor().textContent) && editor().querySelector('.workshop__primary').disabled);
+  editor().querySelector('.sleeve-editor__cancel').click();
+  await until(() => !editor());
+
+  await makeCard(0);
+  await makeCard(200);
+
+  doc.querySelector('[data-action="new"]').click(); await wait(100);
+  doc.querySelector('[data-make="sleeve"]').click();
+  await until(() => editor());
+  check('a new sleeve starts as a toploader with your first card', doc.querySelector('#sleeve-editor-title').textContent === 'New card sleeve'
+    && previewSleeve().classList.contains('card-sleeve--toploader') && !!previewSleeve().querySelector('.card')
+    && doc.querySelector('.sleeve-editor__cards [aria-checked="true"]') === doc.querySelector('.sleeve-editor__cards [data-card-id]'));
+  check('animal and pattern choices are hidden for a toploader', editor().querySelector('[data-for="plush"]').hidden && editor().querySelector('[data-for="puffy"]').hidden);
+
+  pick('style', 'plush');
+  check('Plush shows the animals and draws a bear', !editor().querySelector('[data-for="plush"]').hidden && previewSleeve().classList.contains('card-sleeve--bear'));
+  pick('animal', 'fox');
+  check('choosing the fox makes it orange', previewSleeve().classList.contains('card-sleeve--fox') && previewSleeve().style.getPropertyValue('--sleeve-color') === '#f2a65a'
+    && editor().querySelector('input[name="color"]:checked')?.value === '#f2a65a');
+  pick('animal', 'puppy');
+  check('each animal comes in its own color until you choose one', previewSleeve().style.getPropertyValue('--sleeve-color') === '#fbf8f4');
+  pick('animal', 'fox');
+  pick('color', '#f7c6d9');
+  check('then any color can be chosen', previewSleeve().style.getPropertyValue('--sleeve-color') === '#f7c6d9');
+  pick('charm', 'moon');
+  editor().querySelectorAll('.sleeve-editor__cards [data-card-id]')[1].click();
+  editor().querySelector('[data-sticker="heart"]').click();
+  check('charm, card and a sticker can be chosen', !!previewSleeve().querySelector('.card-sleeve__charm')
+    && editor().querySelectorAll('.sleeve-editor__cards [aria-checked="true"]').length === 1
+    && editor().querySelectorAll('.sleeve-editor__preview .sticker-layer .sticker').length === 1);
+  pick('style', 'puffy');
+  check('Puffy leather shows the patterns, and the sticker stays', !editor().querySelector('[data-for="puffy"]').hidden && editor().querySelector('[data-for="plush"]').hidden
+    && previewSleeve().classList.contains('card-sleeve--pattern-dots') && editor().querySelectorAll('.sleeve-editor__preview .sticker-layer .sticker').length === 1);
+  pick('pattern', 'cakes');
+  pick('style', 'plush');
+  check('a color you chose stays when you change the kind of sleeve', previewSleeve().style.getPropertyValue('--sleeve-color') === '#f7c6d9');
+  editor().querySelector('.workshop__primary').click();
+  await until(() => shelf(), 5000);
+  check('saved: My stuff opens on the Sleeves tab', doc.querySelector('.my-cards__tab[aria-selected="true"]')?.dataset.tab === 'sleeves'
+    && doc.querySelectorAll('.my-cards__item').length === 1);
+  const thumb = doc.querySelector('.my-cards__thumb--sleeve .card-sleeve');
+  check('saved: a pink fox with a moon charm and the second card', thumb?.classList.contains('card-sleeve--fox') && thumb.style.getPropertyValue('--sleeve-color') === '#f7c6d9'
+    && !!thumb.querySelector('.card-sleeve__charm') && thumb.querySelectorAll('.card-sleeve__stickers .sticker').length === 1);
+
+  // Pick it up
+  doc.querySelector('.my-cards__thumb--sleeve').click();
+  await until(() => doc.querySelector('dialog.viewer[open]'));
+  const viewer = doc.querySelector('dialog.viewer[open]');
+  check('picking it up shows the sleeve, front and back', viewer.classList.contains('viewer--shape-sleeve')
+    && !!viewer.querySelector('.viewer__face--front .card-sleeve--front .card') && !!viewer.querySelector('.viewer__face--back .card-sleeve--back'));
+  viewer.querySelector('.viewer__close').click();
+  await until(() => !doc.querySelector('dialog.viewer[open]'), 3000);
+
+  // Edit it again; Cancel keeps it as it was
+  doc.querySelector('.my-cards__item [data-action="edit"]').click();
+  await until(() => editor());
+  check('Edit opens it with its settings', doc.querySelector('#sleeve-editor-title').textContent === 'Edit card sleeve'
+    && editor().querySelector('input[name="animal"]:checked')?.value === 'fox' && editor().querySelector('input[name="charm"]:checked')?.value === 'moon');
+  pick('style', 'fabric');
+  editor().querySelector('.sleeve-editor__cancel').click();
+  await until(() => !editor());
+  doc.querySelector('[data-action="list"]').click();
+  await until(() => shelf());
+  check('Cancel keeps it a fox', doc.querySelector('.my-cards__thumb--sleeve .card-sleeve--fox') !== null);
+  doc.querySelector('.my-cards__item [data-action="edit"]').click();
+  await until(() => editor());
+  pick('style', 'fabric');
+  editor().querySelector('.workshop__primary').click();
+  await until(() => shelf(), 5000);
+  check('Save after editing keeps the change (one sleeve, now fabric)', doc.querySelectorAll('.my-cards__item').length === 1 && !!doc.querySelector('.my-cards__thumb--sleeve .card-sleeve--fabric'));
+  doc.querySelector('.my-cards__close').click();
+  await until(() => !doc.querySelector('dialog[open]'));
+
+  // ---------- On a journal page ----------
+  doc.querySelector('[data-action="new"]').click(); await wait(100);
+  doc.querySelector('[data-make="journal"]').click();
+  await until(() => doc.querySelector('dialog.journal-editor[open]'));
+  const sleeveBtn = doc.querySelector('.journal-editor__thing--sleeve');
+  check('the journal editor offers your sleeve', !!sleeveBtn?.querySelector('.card-sleeve'));
+  sleeveBtn.click();
+  doc.querySelector('dialog.journal-editor .workshop__primary').click();
+  await until(() => doc.querySelector('.leaf__face--front .page--journal .piece--sleeve'), 4000);
+  const piece = doc.querySelector('.leaf__face--front .page--journal .piece--sleeve');
+  check('the sleeve is on the journal page', !!piece?.querySelector('.card-sleeve--fabric .card'));
+  piece.querySelector('[data-merch-id]').click();
+  await until(() => doc.querySelector('dialog.viewer[open]'));
+  check('tapping it on the page picks it up', !!doc.querySelector('dialog.viewer[open].viewer--shape-sleeve'));
+  doc.querySelector('.viewer__close').click();
+  await until(() => !doc.querySelector('dialog.viewer[open]'), 3000);
+
+  // ---------- Deleting its card deletes the sleeve too (after saying so) ----------
+  let question = '';
+  win.confirm = (q) => { question = q; return true; };
+  doc.querySelector('[data-action="list"]').click();
+  await until(() => shelf());
+  doc.querySelector('.my-cards__tab[data-tab="cards"]').click();
+  doc.querySelectorAll('.my-cards__item [data-action="delete"]')[1].click();
+  await until(() => doc.querySelectorAll('.my-cards__item').length === 1);
+  check('deleting the card warns about its sleeve', /in a card sleeve, which will be deleted too/.test(question), question);
+  doc.querySelector('.my-cards__tab[data-tab="sleeves"]').click();
+  check('the sleeve is gone from My stuff', /No card sleeves yet/.test(doc.querySelector('.my-cards__list').textContent));
+  doc.querySelector('.my-cards__close').click();
+  await until(() => !doc.querySelector('dialog[open]'));
+  await wait(300);
+  check('and from the journal page', !doc.querySelector('.piece--sleeve'));
+} catch (e) {
+  results.push('ERROR ' + e.stack);
+}
+out.textContent = results.join('\n');
+out.dataset.done = 1;
+</script>
