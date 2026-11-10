@@ -104,11 +104,11 @@ try {
     return n ? sum / n : 0;
   };
   const middleBefore = middleOf(pc);
-  pushed.push(0, 120); // the badge jerks down → the pieces fly up
+  pushed.push(0, 120); // the badge jerks down → the gel and pieces surge up
   pushed.stop();
-  pushed.advance(12);
+  pushed.advance(30); // half a second: the gel carries them up smoothly, not in a jump
   const middleAfter = middleOf(pc);
-  check('jerking the badge down throws the pieces up', middleBefore - middleAfter > 80, `middle ${middleBefore.toFixed(0)} → ${middleAfter.toFixed(0)}`);
+  check('jerking the badge down makes the gel carry the pieces up', middleBefore - middleAfter > 80, `middle ${middleBefore.toFixed(0)} → ${middleAfter.toFixed(0)}`);
 
   // Settled pieces form a layer along the bottom, not one clump at the lowest point
   const layer = document.createElement('canvas'); layer.width = layer.height = 600;
@@ -125,14 +125,21 @@ try {
   const globeShaker = createShaker(globe, { fill: 'snow', seed: 3 });
   globeShaker.settle(900);
   globeShaker.shake(); globeShaker.stop();
-  globeShaker.advance(15);
-  const quarters = [[0, 0], [300, 0], [0, 300], [300, 300]].map(([x, y]) => {
-    const d = globe.getContext('2d').getImageData(x, y, 300, 300).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0; return n;
-  });
-  check('after a shake, pieces are in every quarter of the badge', quarters.every((n) => n > 200), quarters.join(' / '));
+  // Within 3 s, pieces have drifted through every quarter of the badge (the gel's swirls
+  // pull the layer apart into streams; at any one moment a quarter may happen to be empty)
+  const visited = [0, 0, 0, 0];
+  for (let t = 0; t < 180; t += 15) {
+    globeShaker.advance(15);
+    [[0, 0], [300, 0], [0, 300], [300, 300]].forEach(([x, y], q) => {
+      const d = globe.getContext('2d').getImageData(x, y, 300, 300).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0;
+      visited[q] = Math.max(visited[q], n);
+    });
+  }
+  check('a shake spreads pieces through every quarter of the badge', visited.every((n) => n > 200), visited.join(' / '));
 
   // After a shake, everything comes completely to rest (so the animation stops and saves
-  // battery): within 20 s, even the slow gold dust
+  // battery). The gel is deliberately slow (Diana asked for a thick, gel-like feel), so the
+  // last stragglers can take ~20 s; it must still stop within 25 s.
   for (const fill of FILLS.map((f) => f.value).filter((f) => f !== 'none')) {
     const still = document.createElement('canvas'); still.width = still.height = 600;
     const sh = createShaker(still, { fill, seed: 21 });
@@ -141,7 +148,7 @@ try {
     sh.advance(20);
     const moving = !sh.isSettled;
     let frames = 20;
-    while (!sh.isSettled && frames < 1200) { sh.advance(10); frames += 10; }
+    while (!sh.isSettled && frames < 1500) { sh.advance(10); frames += 10; }
     check(`${fill}: moves when shaken, then comes completely to rest`, moving && sh.isSettled, `${(frames / 60).toFixed(1)} s`);
   }
 

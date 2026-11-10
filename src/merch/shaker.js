@@ -1,6 +1,7 @@
-// 流麻 (shaker) fill: little pieces floating in liquid inside a round badge.
-// They sink with gravity, each at its own speed, flutter a little as they fall, and
-// scatter in every direction when shaken — like a snow globe.
+// 流麻 (shaker) fill: little pieces suspended in gel inside a round badge.
+// The gel itself flows: a shake makes it slosh and turn in big, slow swirls that calm
+// down gradually, and the pieces are carried along by it (easing into its motion, never
+// jumping), while each one slowly sinks at its own speed.
 // The canvas is square; pieces stay inside the circle.
 
 export const FILLS = [
@@ -25,13 +26,19 @@ const STYLES = {
   hearts: { count: 62, size: [20, 32], weight: [0.75, 1.3], flutter: 0.008, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
   sakura: { count: 56, size: [20, 30], weight: [0.5, 0.95], flutter: 0.025, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
   // Fine gold powder: lots of tiny flecks that sparkle and hang in the gel
-  gold: { count: 440, size: [2.5, 6], weight: [0.3, 0.7], flutter: 0.01, overlap: 0.6, dust: true, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
+  gold: { count: 440, size: [2.5, 6], weight: [0.5, 0.8], flutter: 0.01, overlap: 0.6, dust: true, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
 };
 
-// A thick, gel-like liquid: pieces sink slowly (top to bottom in about 6 s), and a shake
-// sends them up through the gel, which soon slows them down again
-const GRAVITY = 0.085; // px per frame²
-const DRAG = 0.92; // how much speed the gel takes away each frame (lower = thicker)
+// How the gel behaves (speeds in px per frame on a 600 px badge)
+const SINK_SPEED = 1.0; // how fast a normal piece sinks through the gel (~6 s top to bottom)
+const FOLLOW = 0.09; // how quickly a piece takes on the gel's motion (lower = more inertia; varies per piece)
+const FLOW_CALM = 0.965; // the gel's sloshing dies down a little every frame…
+const SPIN_CALM = 0.975; // …and so does its turning…
+const STIR_CALM = 0.985; // …and its swirls
+const EDDY_SPEED = 7; // how fast the swirls move pieces when fully stirred
+const MAX_FLOW = 16; // the fastest the gel sloshes
+const MAX_SPIN = 0.006; // the fastest the gel turns (radians per frame)
+const MAX_SPEED = 24; // the fastest any piece moves (px per frame), so nothing jumps
 const SLEEP_FRAMES = 30; // still for half a second → asleep
 const QUIET = 0.0036; // average movement under 0.06 px a frame counts as still (far too small to see)
 const RIM = 0.9; // pieces stay within 90% of the radius (inside the rim)
@@ -61,7 +68,53 @@ export function createShaker(canvas, { fill, seed = 1 }) {
   let quietFrames = 0;
   let time = 0; // frames simulated, for the flutter
   let lastEnergy = Infinity;
-  const swirlDir = random() < 0.5 ? -1 : 1; // this badge's liquid always swirls the same way
+  const swirlDir = random() < 0.5 ? -1 : 1; // this badge's gel always turns the same way
+
+  // ---------- The gel ----------
+  //   flow – the gel sloshing one way (the contents lag behind when the badge moves)
+  //   spin – the gel turning around the middle
+  //   stir – how stirred up it is: a few big swirls that slowly change shape
+  const flow = { x: 0, y: 0 };
+  let spin = 0; // radians per frame
+  let stir = 0; // 0 = calm, 1 = well stirred
+  // Several swirls of different sizes, so different parts of the badge move differently
+  // and a layer of pieces breaks up into a cloud instead of lifting as one sheet
+  // (their own random numbers, so the pieces' layout doesn't depend on them)
+  const gelRandom = seeded(seed ^ 0x5bd1e995);
+  const eddies = Array.from({ length: 4 }, (_, i) => ({
+    kx: (Math.PI * (1.5 + i * 0.6 + gelRandom())) / size,
+    ky: (Math.PI * (1.5 + i * 0.6 + gelRandom())) / size,
+    px: gelRandom() * Math.PI * 2,
+    py: gelRandom() * Math.PI * 2,
+    driftX: (gelRandom() - 0.5) * 0.012,
+    driftY: (gelRandom() - 0.5) * 0.012,
+    amp: 0.6 + gelRandom() * 0.8,
+  }));
+  const gel = { u: 0, v: 0 }; // reused for every piece (no garbage each frame)
+
+  // How the gel is moving at a point (written into `gel`). The swirls come from a
+  // "stream function", which keeps the motion smooth and never squeezes pieces together
+  // or pulls them apart.
+  function gelAt(x, y) {
+    let u = flow.x - (y - center) * spin;
+    let v = flow.y + (x - center) * spin;
+    if (stir > 0) {
+      for (const e of eddies) {
+        const ax = e.kx * x + e.px;
+        const ay = e.ky * y + e.py;
+        const kn = (e.kx + e.ky) / 2;
+        const speed = stir * EDDY_SPEED * k * e.amp;
+        u += speed * (e.ky / kn) * Math.sin(ax) * Math.cos(ay);
+        v -= speed * (e.kx / kn) * Math.cos(ax) * Math.sin(ay);
+      }
+    }
+    gel.u = u;
+    gel.v = v;
+  }
+
+  function gelIsCalm() {
+    return flow.x === 0 && flow.y === 0 && stir === 0 && spin === 0;
+  }
 
   const pieces = !style ? [] : Array.from({ length: style.count }, () => {
     const angle = random() * Math.PI * 2;
@@ -84,33 +137,59 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       phase: random() * Math.PI * 2,
     };
   });
+  // How readily each piece goes with the gel: lighter pieces more, heavier ones lag
+  // behind, and each a little differently, so a stirred layer breaks up into a cloud
+  for (const p of pieces) p.follow = FOLLOW * (1.4 - 0.5 * p.weight) * (0.75 + 0.5 * gelRandom());
 
   function step() {
     time++;
+    // The gel calms down gradually; its swirls slowly change shape
+    flow.x *= FLOW_CALM;
+    flow.y *= FLOW_CALM;
+    spin *= SPIN_CALM;
+    stir *= STIR_CALM;
+    // Once the leftovers are too small to see, the gel is simply still
+    if (Math.hypot(flow.x, flow.y) < 0.05 * k) flow.x = flow.y = 0;
+    if (Math.abs(spin) < 0.0002) spin = 0;
+    if (stir < 0.02) stir = 0;
+    for (const e of eddies) {
+      e.px += e.driftX;
+      e.py += e.driftY;
+    }
+    const calm = gelIsCalm();
+
     for (const p of pieces) {
       p.px = p.x;
       p.py = p.y;
-      // A piece that has been still for a while "sleeps": gravity no longer presses it
-      // into the pile, so the pile stays perfectly still. Tilting, shaking or being bumped
-      // wakes it up.
-      if (p.still > SLEEP_FRAMES) {
+      // A piece that has been still for a while (in a calm gel) "sleeps": it no longer
+      // presses into the pile, so the pile stays perfectly still. Tilting, shaking or
+      // being bumped wakes it up.
+      if (calm && p.still > SLEEP_FRAMES) {
         p.vx = p.vy = 0;
         continue;
       }
-      // Drift across the direction of fall (a falling snowflake rocks side to side) — only
-      // while it's actually moving, so pieces resting in the pile lie still and the loop can stop
+      // Where the gel would carry it, plus its own slow sinking and a gentle rocking
+      gelAt(p.x, p.y);
+      const sink = SINK_SPEED * p.weight * k;
       const falling = Math.min(1, (p.moved ?? 1) / (1.5 * k));
-      const sway = Math.sin(time * p.freq + p.phase) * p.flutter * falling;
-      const jitter = 0.03 * falling;
-      p.vx = (p.vx + (gravity.x * GRAVITY * p.weight - gravity.y * sway + (random() - 0.5) * jitter) * k) * DRAG;
-      p.vy = (p.vy + (gravity.y * GRAVITY * p.weight + gravity.x * sway + (random() - 0.5) * jitter) * k) * DRAG;
+      const sway = Math.sin(time * p.freq + p.phase) * p.flutter * falling * 20 * k;
+      const targetX = gel.u + gravity.x * sink - gravity.y * sway;
+      const targetY = gel.v + gravity.y * sink + gravity.x * sway;
+      // Ease into that motion: pieces have a little inertia, so everything stays smooth
+      p.vx += (targetX - p.vx) * p.follow;
+      p.vy += (targetY - p.vy) * p.follow;
+      const speed = Math.hypot(p.vx, p.vy);
+      if (speed > MAX_SPEED * k) {
+        p.vx *= (MAX_SPEED * k) / speed;
+        p.vy *= (MAX_SPEED * k) / speed;
+      }
       p.x += p.vx;
       p.y += p.vy;
       p.rot += p.spin + p.vx * 0.01;
     }
     separate();
     // How much things actually moved this frame (pieces resting in the pile don't, even
-    // though gravity keeps pressing them down)
+    // though they keep sinking into it)
     let energy = 0;
     for (const p of pieces) {
       keepInside(p); // after separating, which can nudge pieces outwards
@@ -120,7 +199,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       p.still = p.moved < 0.12 * k ? (p.still ?? 0) + 1 : 0;
       energy += mx * mx + my * my;
     }
-    lastEnergy = energy / Math.max(1, pieces.length);
+    lastEnergy = calm ? energy / Math.max(1, pieces.length) : Infinity;
     return lastEnergy;
   }
 
@@ -145,7 +224,10 @@ export function createShaker(canvas, { fill, seed = 1 }) {
         p.vy *= 0.9;
         // …and when it's only creeping, it sticks (static friction), so a pile on the
         // curved bottom stays put instead of slowly sliding and re-settling forever
-        if (Math.hypot(p.vx, p.vy) < 0.4 * k) p.vx = p.vy = 0;
+        // (only at the bottom, in a calm gel, when it's barely moving: on the sloping
+        // sides, or when you tilt the phone, pieces still slide down the wall)
+        const atBottom = nx * gravity.x + ny * gravity.y > 0.85;
+        if (atBottom && gelIsCalm() && Math.hypot(p.vx, p.vy) < 0.12 * k) p.vx = p.vy = 0;
       }
     }
   }
@@ -207,25 +289,12 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     for (const p of pieces) p.still = 0;
   }
 
-  // Turn the liquid around the middle (always the same way for this badge, so repeated
-  // shakes add up to a swirl instead of cancelling out)
-  function swirl(amount) {
-    const dir = swirlDir;
-    for (const p of pieces) {
-      const dx = p.x - center;
-      const dy = p.y - center;
-      const r = Math.hypot(dx, dy) / radius;
-      p.vx += -dy / radius * amount * dir * (0.5 + r);
-      p.vy += dx / radius * amount * dir * (0.5 + r);
-    }
-  }
-
-  function limit(p) {
-    const MAX = 30 * k;
-    const speed = Math.hypot(p.vx, p.vy);
-    if (speed > MAX) {
-      p.vx *= MAX / speed;
-      p.vy *= MAX / speed;
+  function limitFlow() {
+    const f = Math.hypot(flow.x, flow.y);
+    const max = MAX_FLOW * k;
+    if (f > max) {
+      flow.x *= max / f;
+      flow.y *= max / f;
     }
   }
 
@@ -266,7 +335,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     get hasPieces() { return pieces.length > 0; },
 
     // True once nothing is moving any more (the animation loop stops then)
-    get isSettled() { return lastEnergy < QUIET * k * k; },
+    get isSettled() { return gelIsCalm() && lastEnergy < QUIET * k * k; },
 
     // Let everything sink to the bottom straight away (for still pictures)
     settle(steps = 900) {
@@ -292,37 +361,28 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       }
     },
 
-    // The badge moved by (dx, dy) canvas pixels: the pieces lag behind, so they're
-    // pushed the other way (a little differently each, so they spread out)
-    // Not every piece moves the same way: each also gets a kick in its own random
-    // direction, and the liquid swirls, so they scatter like a shaken snow globe
+    // The badge moved by (dx, dy) canvas px (a finger or the phone): the gel and its
+    // contents lag behind, sloshing the other way, and it gets a little stirred up
     push(dx, dy) {
       wakeAll();
-      const strength = Math.hypot(dx, dy) * 0.6;
-      swirl(strength * 0.12);
-      for (const p of pieces) {
-        const along = 0.4 + random() * 1.2;
-        const angle = random() * Math.PI * 2;
-        const kick = strength * random() * 0.9;
-        p.vx += -dx * 0.6 * along + Math.cos(angle) * kick;
-        p.vy += -dy * 0.6 * along + Math.sin(angle) * kick;
-        limit(p);
-      }
+      flow.x -= dx * 0.3;
+      flow.y -= dy * 0.3;
+      limitFlow();
+      const amount = Math.hypot(dx, dy) / (20 * k);
+      stir = Math.min(1.5, stir + amount * 0.25);
+      spin = Math.max(-MAX_SPIN, Math.min(MAX_SPIN, spin + swirlDir * Math.min(amount, 3) * 0.0006));
       this.start();
     },
 
-    // Swirl everything up and out
-    shake(strength = 14 * k) {
+    // A good shake: the gel surges up (against gravity), turns, and swirls.
+    // strength: 1 = a normal shake
+    shake(strength = 1) {
       wakeAll();
-      swirl(strength * 0.15);
-      for (const p of pieces) {
-        const angle = random() * Math.PI * 2;
-        const kick = strength * (0.5 + random() * 1.5);
-        const lift = strength * (0.6 + random() * 1.2); // up, against gravity, by a different amount each
-        p.vx += Math.cos(angle) * kick - gravity.x * lift;
-        p.vy += Math.sin(angle) * kick - gravity.y * lift;
-        limit(p);
-      }
+      flow.x -= gravity.x * 7 * k * strength;
+      flow.y -= gravity.y * 7 * k * strength;
+      limitFlow();
+      stir = Math.min(1.5, stir + 1.1 * strength);
+      spin = Math.max(-MAX_SPIN, Math.min(MAX_SPIN, spin + swirlDir * 0.003 * strength));
       this.start();
     },
 
