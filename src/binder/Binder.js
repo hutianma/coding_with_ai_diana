@@ -3,6 +3,7 @@ import { PageFlip } from './PageFlip.js';
 import { createPaging, pageLabel, clamp } from './paging.js';
 import { emptySlots } from './layout.js';
 import { openCardViewer } from '../cards/CardViewer.js';
+import { decorateCover } from './CoverDesign.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
@@ -11,7 +12,8 @@ const phoneQuery = matchMedia('(max-width: 700px)');
 // startPage: 0 = closed on the cover, 1+ = open at that page.
 // toolbarEnd / notice: optional elements shown at the right of the toolbar / under it.
 // fadeIn: fade the binder in (off when redrawing after a change).
-export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true } = {}) {
+// onEditCover: shows a "✎ Edit cover" button while the binder is closed.
+export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true, onEditCover = null } = {}) {
   // A binder always has at least one (empty) page, so it can be opened
   const pages = binder.pages.length ? binder.pages : [emptyPage(binder.layout)];
 
@@ -24,13 +26,18 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   const toolbar = document.createElement('header');
   toolbar.className = 'toolbar';
   toolbar.innerHTML = `
-    <button class="toolbar__back" type="button">‹ Cover</button>
+    <span class="toolbar__start">
+      <button class="toolbar__back" type="button">‹ Cover</button>
+      <button class="toolbar__action toolbar__edit" type="button" hidden>✎ Edit cover</button>
+    </span>
     <span class="toolbar__title"></span>
     <span></span>
   `;
   // textContent (not innerHTML) so names are always shown as plain text
   toolbar.querySelector('.toolbar__title').textContent = binder.name;
   const backBtn = toolbar.querySelector('.toolbar__back');
+  const editBtn = toolbar.querySelector('.toolbar__edit');
+  if (onEditCover) editBtn.addEventListener('click', onEditCover);
   if (toolbarEnd) toolbar.lastElementChild.replaceWith(toolbarEnd);
 
   const stage = document.createElement('div');
@@ -67,6 +74,7 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   function onSettle(current) {
     const closed = current === 0;
     backBtn.hidden = closed;
+    editBtn.hidden = !closed || !onEditCover;
     const lost = !view.contains(document.activeElement) || document.activeElement.closest('[inert]') ||
       (document.activeElement === backBtn && closed);
     if (focusBefore && lost) {
@@ -88,15 +96,8 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
     cover.type = 'button';
     cover.className = 'cover-face';
     cover.setAttribute('aria-label', `Open binder: ${binder.name}`);
-    cover.innerHTML = `
-      <span class="cover-face__label">
-        <span class="cover-face__title"></span>
-        <span class="cover-face__count"></span>
-      </span>
-      <span class="cover-face__hint" aria-hidden="true">Tap or drag to open</span>
-    `;
-    cover.querySelector('.cover-face__title').textContent = binder.name;
-    cover.querySelector('.cover-face__count').textContent = plural(countCards(binder), 'card');
+    cover.innerHTML = '<span class="cover-face__hint" aria-hidden="true">Tap or drag to open</span>';
+    decorateCover(cover, binder, binder.cards, { count: plural(countCards(binder), 'card') });
     cover.addEventListener('click', () => flip.next());
     return cover;
   }
