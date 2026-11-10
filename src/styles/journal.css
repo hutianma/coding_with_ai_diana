@@ -254,7 +254,8 @@
   color: #c0392b;
 }
 
-.journal-editor fieldset > legend {
+.journal-editor fieldset > legend,
+.sleeve-editor fieldset > legend {
   margin-bottom: 6px;
   text-align: center;
   font-size: 0.85rem;

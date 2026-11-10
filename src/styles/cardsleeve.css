@@ -276,6 +276,7 @@
 }
 
 .sleeve-editor fieldset[hidden] { display: none; }
+.sleeve-editor__cards { justify-content: safe center; }
 
 @media (min-width: 701px) {
   .sleeve-editor__preview { width: min(240px, (100svh - 280px) * var(--ratio, 0.6)); }
