@@ -8,10 +8,10 @@ export const MAX_SCALE = 3;
 
 // surface: the element the stickers sit on (position: relative).
 // stickers: the array of placed stickers; it is changed in place.
-// onChange(): called after every change.
-export function createStickerLayer(surface, stickers, { onChange = () => {} } = {}) {
+export function createStickerLayer(surface, stickers) {
   const layer = document.createElement('div');
   layer.className = 'sticker-layer';
+  layer.tabIndex = -1; // somewhere for keyboard focus to go after removing a sticker
   surface.append(layer);
 
   const tools = document.createElement('div');
@@ -28,7 +28,8 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
 
   let selectedId = null;
 
-  function draw() {
+  // Redraw every sticker; keep keyboard focus on the selected one if it had focus
+  function draw({ focus = false } = {}) {
     layer.replaceChildren(...stickers.map((sticker) => {
       const el = createSticker(sticker);
       el.tabIndex = 0;
@@ -38,6 +39,7 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
       return el;
     }));
     tools.hidden = !selectedId;
+    if (focus) (layer.querySelector(`[data-sticker-id="${selectedId}"]`) ?? layer).focus();
   }
 
   const byId = (id) => stickers.find((s) => s.id === id);
@@ -54,7 +56,6 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
     sticker.y = Math.min(1, Math.max(0, sticker.y));
     const el = layer.querySelector(`[data-sticker-id="${sticker.id}"]`);
     if (el) placeSticker(el, sticker);
-    onChange();
   }
 
   // ---------- Fingers and mouse ----------
@@ -62,6 +63,12 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
   let grabbed = null; // the sticker being moved
 
   layer.addEventListener('pointerdown', (event) => {
+    // A second finger while one is holding a sticker: that's a pinch, wherever it lands
+    if (grabbed && pointers.size === 1) {
+      try { layer.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      return;
+    }
     const el = event.target.closest('.sticker');
     if (!el) {
       select(null);
@@ -124,8 +131,7 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
       stickers.splice(stickers.indexOf(sticker), 1);
       if (tool === 'front') stickers.push(sticker);
       else selectedId = null;
-      draw();
-      onChange();
+      draw({ focus: true });
       return;
     }
     update(sticker);
@@ -151,8 +157,7 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
       event.preventDefault();
       stickers.splice(stickers.indexOf(sticker), 1);
       selectedId = null;
-      draw();
-      onChange();
+      draw({ focus: true });
     }
   });
 
@@ -177,11 +182,7 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
       stickers.push(sticker);
       selectedId = sticker.id;
       draw();
-      onChange();
       return sticker;
     },
-
-    deselect() { select(null); },
-    redraw: draw,
   };
 }

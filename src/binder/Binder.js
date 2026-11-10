@@ -28,7 +28,7 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   toolbar.innerHTML = `
     <span class="toolbar__start">
       <button class="toolbar__back" type="button">‹ Cover</button>
-      <button class="toolbar__action toolbar__edit" type="button" hidden>✎ Edit cover</button>
+      <button class="toolbar__action toolbar__edit" type="button" aria-label="Edit cover" hidden>✎ Edit</button>
     </span>
     <span class="toolbar__title"></span>
     <span></span>
@@ -37,7 +37,13 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   toolbar.querySelector('.toolbar__title').textContent = binder.name;
   const backBtn = toolbar.querySelector('.toolbar__back');
   const editBtn = toolbar.querySelector('.toolbar__edit');
-  if (onEditCover) editBtn.addEventListener('click', onEditCover);
+  if (onEditCover) {
+    editBtn.addEventListener('click', () => {
+      // Only while the binder is closed and still (not while the cover is turning)
+      if (flip.current !== 0 || flip.isDragging || flip.running) return;
+      onEditCover();
+    });
+  }
   if (toolbarEnd) toolbar.lastElementChild.replaceWith(toolbarEnd);
 
   const stage = document.createElement('div');

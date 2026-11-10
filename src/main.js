@@ -142,6 +142,10 @@ async function start() {
 
   async function onDelete(card) {
     await deleteCard(binder, card.id);
+    // The cover's window showed this card: empty the window
+    if (binder.cover?.window?.cardId === card.id) {
+      await saveBinderDesign(binder, { name: binder.name, cover: { ...binder.cover, window: null } });
+    }
     releaseImage(card.front);
     releaseImage(card.signature);
     delete cards[card.id];

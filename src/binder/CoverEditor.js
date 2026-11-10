@@ -3,7 +3,7 @@
 import { decorateCover, coverOf, MATERIALS, COVER_COLORS, FONTS, WINDOW_SHAPES } from './CoverDesign.js';
 import { createStickerLayer } from '../decor/StickerLayer.js';
 import { BUILTIN_STICKERS, builtinUrl } from '../decor/stickers.js';
-import { imageUrl } from '../cards/imageUrls.js';
+import { imageUrl, releaseImage } from '../cards/imageUrls.js';
 import { pickPhotos } from '../workshop/pickPhotos.js';
 import { loadImage, unloadImage, canvasToBlob } from '../workshop/imageTools.js';
 
@@ -14,11 +14,14 @@ const STICKER_IMAGE_MAX = 400; // your own sticker images are kept at most 400 p
 export function openCoverEditor({ binder, cards = {}, onSave }) {
   // Work on a copy; nothing changes until Save
   const start = coverOf(binder);
+  const cardList = Object.values(cards).filter((c) => c.front).sort((a, b) => a.createdAt - b.createdAt);
+  // A window card that has since been deleted counts as no window
+  const startWindow = start.window && cards[start.window.cardId] ? { ...start.window } : null;
   const draft = {
     name: binder.name,
-    cover: { ...start, window: start.window ? { ...start.window } : null, stickers: start.stickers.map((s) => ({ ...s })) },
+    cover: { ...start, window: startWindow, stickers: start.stickers.map((s) => ({ ...s })) },
   };
-  const cardList = Object.values(cards).filter((c) => c.front).sort((a, b) => a.createdAt - b.createdAt);
+  const startImages = new Set(start.stickers.filter((s) => s.kind === 'image').map((s) => s.image));
 
   const dialog = document.createElement('dialog');
   dialog.className = 'workshop cover-editor';
@@ -134,8 +137,16 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     drawDesign();
   });
 
-  // Window: none, or one of your cards
+  // Window: none, or one of your cards. Choosing one updates the buttons in place, so
+  // keyboard / VoiceOver focus stays where it is.
   const cardsBox = $('.cover-editor__cards');
+  function markCardChoice() {
+    const current = draft.cover.window?.cardId ?? '';
+    cardsBox.querySelectorAll('[role="radio"]').forEach((b) => {
+      b.setAttribute('aria-checked', String((b.dataset.cardId ?? '') === current));
+    });
+    $('.window-shapes').hidden = !draft.cover.window;
+  }
   function drawCardChoices() {
     const current = draft.cover.window?.cardId ?? null;
     const none = document.createElement('button');
@@ -146,7 +157,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     none.textContent = 'None';
     none.addEventListener('click', () => {
       draft.cover.window = null;
-      drawCardChoices();
+      markCardChoice();
       drawDesign();
     });
     const items = cardList.map((card, i) => {
@@ -156,6 +167,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
       btn.setAttribute('role', 'radio');
       btn.setAttribute('aria-checked', String(card.id === current));
       btn.setAttribute('aria-label', card.back?.text || `Card ${i + 1}`);
+      btn.dataset.cardId = card.id;
       const img = document.createElement('img');
       img.alt = '';
       img.src = imageUrl(card.front);
@@ -163,7 +175,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
       btn.addEventListener('click', () => {
         const shape = dialog.querySelector('input[name="shape"]:checked')?.value ?? 'rounded';
         draft.cover.window = { cardId: card.id, shape };
-        drawCardChoices();
+        markCardChoice();
         drawDesign();
       });
       return btn;
@@ -188,11 +200,15 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     }
     const [file] = await pickPhotos();
     if (!file) return;
+    setBusy(true); // Save / Cancel wait until the sticker is ready
     try {
-      stickerLayer.add('image', await shrinkSticker(file));
+      const image = await shrinkSticker(file);
+      if (dialog.isConnected) stickerLayer.add('image', image);
       showError('');
     } catch (err) {
       showError(err.message);
+    } finally {
+      setBusy(false);
     }
   });
 
@@ -202,24 +218,35 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     errorEl.hidden = !message;
   }
 
-  function close() {
+  function setBusy(value) {
+    busy = value;
+    $('.workshop__primary').disabled = $('.workshop__secondary').disabled = value;
+  }
+
+  // Let go of sticker images that are no longer used (to free memory): after Save, the
+  // ones taken off the cover; after Cancel, the ones added in this session
+  function close(saved = false) {
+    const kept = new Set((saved ? draft.cover.stickers : start.stickers)
+      .filter((s) => s.kind === 'image').map((s) => s.image));
+    const all = new Set([...startImages, ...draft.cover.stickers.filter((s) => s.kind === 'image').map((s) => s.image)]);
+    for (const image of all) if (!kept.has(image)) releaseImage(image);
     dialog.close();
     dialog.remove();
   }
 
   $('.workshop__primary').addEventListener('click', async () => {
     if (busy) return;
-    busy = true;
-    $('.workshop__primary').disabled = $('.workshop__secondary').disabled = true;
+    setBusy(true);
     showError('');
     try {
-      await onSave({ name: draft.name.trim() || binder.name, cover: draft.cover });
-      close();
+      // A copy, so later changes in this (closing) editor can't reach the saved cover
+      const cover = { ...draft.cover, window: draft.cover.window ? { ...draft.cover.window } : null, stickers: draft.cover.stickers.map((s) => ({ ...s })) };
+      await onSave({ name: draft.name.trim() || binder.name, cover });
+      close(true);
     } catch (err) {
       showError(`Couldn't save the cover. ${err.message ?? ''}`.trim());
     } finally {
-      busy = false;
-      $('.workshop__primary').disabled = $('.workshop__secondary').disabled = false;
+      setBusy(false);
     }
   });
   $('.workshop__secondary').addEventListener('click', () => { if (!busy) close(); });
