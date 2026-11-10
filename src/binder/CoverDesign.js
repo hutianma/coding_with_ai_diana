@@ -6,10 +6,15 @@ import { createSticker } from '../decor/stickers.js';
 
 export const MATERIALS = [
   { value: 'pastel', name: 'Pastel' },
-  { value: 'leather', name: 'Leather' },
+  { value: 'pu', name: 'PU leather' },
   { value: 'glitter', name: 'Glitter' },
-  { value: 'clear', name: 'Clear' },
+  { value: 'furry', name: 'Furry' },
+  { value: 'frosted', name: 'Frosted' },
+  { value: 'pearl', name: 'Pearl' },
 ];
+
+// Materials that were renamed (covers saved before keep working)
+const RENAMED = { leather: 'pu', clear: 'frosted' };
 
 export const COVER_COLORS = [
   { value: '#f2b8cc', name: 'Pink' },
@@ -37,13 +42,23 @@ export const WINDOW_SHAPES = [
   { value: 'arch', name: 'Arch' },
 ];
 
+// The title's position (its centre, as fractions of the cover) and size (1 = normal)
+export const DEFAULT_TITLE = { x: 0.5, y: 0.17, size: 1 };
+export const TITLE_SIZE = { min: 0.6, max: 1.8 };
+
 export function defaultCover(color = COVER_COLORS[0].value) {
-  return { material: 'pastel', color, font: 'rounded', window: null, stickers: [] };
+  return { material: 'pastel', color, font: 'rounded', title: { ...DEFAULT_TITLE }, window: null, stickers: [] };
 }
 
 // The binder's cover settings, filling in anything missing (older binders had only a color)
 export function coverOf(binder) {
-  return { ...defaultCover(binder.coverColor), ...(binder.cover ?? {}) };
+  const cover = { ...defaultCover(binder.coverColor), ...(binder.cover ?? {}) };
+  cover.material = RENAMED[cover.material] ?? cover.material;
+  if (!MATERIALS.some((m) => m.value === cover.material)) cover.material = 'pastel';
+  // Covers saved before the title could move: above the window if there is one
+  const startY = binder.cover?.window && !binder.cover?.title ? 0.1 : DEFAULT_TITLE.y;
+  cover.title = { ...DEFAULT_TITLE, y: startY, ...(cover.title ?? {}) };
+  return cover;
 }
 
 export function fontCss(font) {
@@ -59,10 +74,10 @@ export function decorateCover(el, binder, cards = {}, { count = null } = {}) {
   el.classList.toggle('cover-design--dark', isDark(cover.color));
 
   const windowCard = cover.window ? cards[cover.window.cardId] : null;
-  el.classList.toggle('cover-design--has-window', Boolean(windowCard));
 
   const label = document.createElement('span');
   label.className = 'cover-design__label';
+  placeTitle(label, cover.title);
   const title = document.createElement('span');
   title.className = 'cover-design__title';
   title.style.fontFamily = fontCss(cover.font);
@@ -94,6 +109,13 @@ export function decorateCover(el, binder, cards = {}, { count = null } = {}) {
 
   el.prepend(...parts);
   return el;
+}
+
+// Put the title where it was dragged, at its size
+export function placeTitle(label, title) {
+  label.style.left = `${title.x * 100}%`;
+  label.style.top = `${title.y * 100}%`;
+  label.style.setProperty('--title-size', title.size);
 }
 
 function isDark(hex) {

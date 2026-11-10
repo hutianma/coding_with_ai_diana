@@ -80,6 +80,8 @@ export class PageFlip {
 
     this.gesture = null; // the drag in progress, if any
     this.el.addEventListener('pointerdown', this.onPointerDown);
+    this.el.addEventListener('touchstart', this.onTouchStart, { passive: true });
+    this.el.addEventListener('touchmove', this.onTouchMove, { passive: false });
     // After a drag, swallow the click that browsers fire on release (so a drag never "taps" a card)
     this.el.addEventListener('click', this.onClickCapture, true);
   }
@@ -136,6 +138,9 @@ export class PageFlip {
     leaf.el.style.zIndex = this.zTurning;
     leaf.el.style.visibility = 'visible';
     leaf.el.style.willChange = 'transform'; // only the turning leaf gets its own GPU layer
+    // While a page turns, expensive effects (blur behind a frosted cover, blend modes,
+    // sticker shadows) are switched off, so phones can keep up (see binder.css)
+    this.el.classList.add('is-turning');
     return leaf;
   }
 
@@ -219,7 +224,32 @@ export class PageFlip {
     g.samples.push({ x: event.clientX, t: event.timeStamp });
     while (g.samples.length > 2 && event.timeStamp - g.samples[0].t > FLICK_WINDOW_MS) g.samples.shift();
 
-    if (g.leaf) this.setProgress(g.leaf, this.dragProgress(g));
+    // Draw at most once per screen refresh (touch screens can report moves faster)
+    if (g.leaf && !this.dragFrame) {
+      this.dragFrame = requestAnimationFrame(() => {
+        this.dragFrame = 0;
+        if (this.gesture?.leaf) this.setProgress(this.gesture.leaf, this.dragProgress(this.gesture));
+      });
+    }
+  };
+
+  // iPhone Safari: a sideways swipe on the binder must not start scrolling the page
+  // (that cancels the page turn). Pointer events can't stop scrolling there; touch
+  // events can, if we say so on the very first move.
+  onTouchStart = (event) => {
+    const t = event.touches[0];
+    this.touchStart = t ? { x: t.clientX, y: t.clientY } : null;
+  };
+
+  onTouchMove = (event) => {
+    const t = event.touches[0];
+    if (!t || !this.touchStart || event.touches.length > 1) return; // two fingers: let pinch-zoom happen
+    const dx = t.clientX - this.touchStart.x;
+    const dy = t.clientY - this.touchStart.y;
+    // Only once it's clearly sideways (a few px, more across than down), so a vertical
+    // scroll that starts with a tiny wobble still scrolls
+    const sideways = Math.abs(dx) >= 6 && Math.abs(dx) > Math.abs(dy);
+    if (this.gesture?.dir || sideways) event.preventDefault();
   };
 
   // 0 = flat on the right, 1 = flat on the left. Dragging one page width turns the page fully on
@@ -291,6 +321,8 @@ export class PageFlip {
   };
 
   endGesture() {
+    cancelAnimationFrame(this.dragFrame);
+    this.dragFrame = 0;
     removeEventListener('pointermove', this.onPointerMove);
     removeEventListener('pointerup', this.onPointerUp);
     removeEventListener('pointercancel', this.onPointerCancel);
@@ -359,6 +391,7 @@ export class PageFlip {
     });
     this.shadowLeft.style.opacity = this.shadowRight.style.opacity = 0;
     this.setClosed(this.cover && this.current === 0 ? 1 : 0);
+    if (!this.isDragging) this.el.classList.remove('is-turning');
     this.onSettle?.(this.current);
   }
 

@@ -45,6 +45,7 @@ const set = (name, value) => doc.querySelector(`dialog.cover-editor input[name="
 try {
   // ---------- Pure helpers ----------
   check('older binders (only a color) still get a full cover design', coverOf({ coverColor: '#123456' }).color === '#123456' && coverOf({}).material === 'pastel');
+  check('covers saved with old material names still work', coverOf({ cover: { material: 'leather' } }).material === 'pu' && coverOf({ cover: { material: 'clear' } }).material === 'frosted');
   check('every built-in sticker makes an image', Object.keys(BUILTIN_STICKERS).every((k) => builtinUrl(k).startsWith('data:image/svg+xml')));
 
   // ---------- Make a card so the window has something to show ----------
@@ -70,8 +71,8 @@ try {
   const preview = () => doc.querySelector('.cover-editor__design');
   check('the editor opens with a live preview', !!preview() && preview().classList.contains('cover-design--pastel'));
 
-  set('material', 'leather');
-  check('choosing Leather changes the preview', preview().classList.contains('cover-design--leather'));
+  set('material', 'pu');
+  check('choosing PU leather changes the preview', preview().classList.contains('cover-design--pu'));
   set('color', '#2b2230');
   check('a dark color switches to light text', preview().classList.contains('cover-design--dark'));
   set('font', 'classic');
@@ -79,6 +80,34 @@ try {
   const name = doc.querySelector('dialog.cover-editor input[name="name"]');
   name.value = '<b>My</b> 앨범'; name.dispatchEvent(new win.Event('input'));
   check('the name is shown as plain text', preview().querySelector('.cover-design__title').textContent === '<b>My</b> 앨범' && !preview().querySelector('b'));
+
+  // The title can be dragged, moved with arrow keys, and resized
+  const label = () => preview().querySelector('.cover-design__label');
+  const titleRect = label().getBoundingClientRect();
+  const pv = doc.querySelector('.cover-editor__preview');
+  const tp = (type, x, y) => (type === 'pointerdown' ? label() : pv).dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 41, isPrimary: true, clientX: x, clientY: y }));
+  const top0 = parseFloat(label().style.top);
+  tp('pointerdown', titleRect.left + 10, titleRect.top + 10);
+  tp('pointermove', titleRect.left + 10, titleRect.top + 70);
+  tp('pointerup', titleRect.left + 10, titleRect.top + 70);
+  const top1 = parseFloat(label().style.top);
+  check('dragging the title moves it down', top1 > top0 + 10, `${top0}% → ${top1}%`);
+  check('…without selecting or adding a sticker', doc.querySelector('.sticker-tools').hidden && !doc.querySelectorAll('.cover-editor__preview .sticker-layer .sticker').length);
+  // Dragging far to the left stops with the whole title still on the cover
+  const t2 = label().getBoundingClientRect();
+  tp('pointerdown', t2.left + 10, t2.top + 10);
+  tp('pointermove', t2.left - 400, t2.top + 10);
+  tp('pointerup', t2.left - 400, t2.top + 10);
+  check('the title can\'t be dragged off the cover', label().getBoundingClientRect().left >= pv.getBoundingClientRect().left - 1);
+  tp('pointerdown', label().getBoundingClientRect().left + 10, label().getBoundingClientRect().top + 10);
+  tp('pointermove', label().getBoundingClientRect().left + 140, label().getBoundingClientRect().top + 10);
+  tp('pointerup', 0, 0);
+  label().focus();
+  label().dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+  check('↑ moves the title up a little', parseFloat(label().style.top) < top1);
+  const size = doc.querySelector('dialog.cover-editor input[name="title-size"]');
+  size.value = '1.5'; size.dispatchEvent(new win.Event('input'));
+  check('the title size slider makes it bigger', label().style.getPropertyValue('--title-size') === '1.5');
 
   check('window: shapes are hidden until a card is chosen', doc.querySelector('.window-shapes').hidden);
   doc.querySelectorAll('.cover-editor__card')[1].click();
@@ -134,21 +163,23 @@ try {
   await until(() => !editor());
   await wait(300);
   const face = coverFace();
-  check('saved: the cover is leather and dark', face.classList.contains('cover-design--leather') && face.classList.contains('cover-design--dark'));
+  check('saved: the cover is PU leather and dark', face.classList.contains('cover-design--pu') && face.classList.contains('cover-design--dark'));
   check('saved: the new name (as plain text)', face.querySelector('.cover-design__title').textContent === '<b>My</b> 앨범' && !face.querySelector('b'));
   check('saved: the card window and 2 stickers', !!face.querySelector('.cover-design__window--heart img') && face.querySelectorAll('.sticker').length === 2);
+  check('saved: the title stays where it was dragged', parseFloat(face.querySelector('.cover-design__label').style.top) > top0 + 5);
+  check('saved: …and its size', face.querySelector('.cover-design__label').style.getPropertyValue('--title-size') === '1.5');
   check('saved: the toolbar shows the new name', doc.querySelector('.toolbar__title').textContent === '<b>My</b> 앨범');
 
   // ---------- Cancel keeps the old design ----------
   doc.querySelector('.toolbar__edit').click();
   await until(() => editor());
-  check('reopening shows the saved settings', doc.querySelector('dialog.cover-editor input[name="material"]:checked')?.value === 'leather'
+  check('reopening shows the saved settings', doc.querySelector('dialog.cover-editor input[name="material"]:checked')?.value === 'pu'
     && doc.querySelector('dialog.cover-editor input[name="name"]').value === '<b>My</b> 앨범');
   set('material', 'glitter');
   doc.querySelector('[data-sticker="crown"]').click();
   doc.querySelector('dialog.cover-editor .workshop__secondary').click();
   await until(() => !editor());
-  check('Cancel keeps the saved cover', coverFace().classList.contains('cover-design--leather') && coverFace().querySelectorAll('.sticker').length === 2);
+  check('Cancel keeps the saved cover', coverFace().classList.contains('cover-design--pu') && coverFace().querySelectorAll('.sticker').length === 2);
 
   // Deleting the card that's in the window empties the window
   win.confirm = () => true;
