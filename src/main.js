@@ -1,7 +1,7 @@
 // App entry point: load your cards and show your binder.
 import { createSampleBinder } from './data/sampleBinder.js';
 import { mountBinder } from './binder/Binder.js';
-import { loadCollection, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign, saveJournalPage, deleteJournalPage, isJournal } from './storage/collection.js';
+import { loadCollection, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign, saveJournalPage, deleteJournalPage, isJournal, journalUses } from './storage/collection.js';
 import { openJournalEditor } from './journal/JournalEditor.js';
 import { newJournalPage } from './journal/JournalPage.js';
 import { openCoverEditor } from './binder/CoverEditor.js';
@@ -44,11 +44,13 @@ async function start() {
   if (savingIsAvailable()) askToKeepData();
   const { binder, cards } = collection;
   let view = null;
+  let showingSamples = false; // the sample binder is shown (you haven't made anything yet)
 
   // Draw the binder. Until you've made a card (or a journal page), show the sample cards with a hint.
   function show(page, fadeIn = false) {
     view?.destroy();
     const hasCards = Object.keys(cards).length > 0 || binder.pages.some(isJournal);
+    showingSamples = !hasCards;
     let notice = null;
     if (!savingIsAvailable()) {
       notice = createNotice("Saving isn't working in this browser right now (private browsing?). Cards you make won't be kept. Try reloading the page.");
@@ -82,9 +84,10 @@ async function start() {
 
   // ---------- Journal pages ----------
 
-  // A new journal page goes right after the page you're looking at
+  // A new journal page goes right after the page you're looking at (at the end while
+  // the sample cards are shown: those pages aren't in your binder)
   function newJournal() {
-    const insertAt = view?.lastPage ?? 0;
+    const insertAt = showingSamples ? binder.pages.length : view?.lastPage ?? 0;
     openJournalEditor({
       page: newJournalPage(),
       isNew: true,
@@ -165,7 +168,7 @@ async function start() {
     if (wasOnAPage) show(view?.page ?? 0);
   }
 
-  const isOnAPage = (merchId) => binder.pages.some((page) => isJournal(page) && page.items.some((i) => i.merchId === merchId));
+  const isOnAPage = (merchId) => journalUses(binder, (item) => item.merchId === merchId);
 
   // A journal page shows this badge / polaroid: draw the binder again so it's up to date
   function redrawIfOnAPage(merchId) {

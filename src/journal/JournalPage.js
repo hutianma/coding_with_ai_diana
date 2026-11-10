@@ -1,4 +1,4 @@
-// A journal (手帐) page: a sheet of paper in the binder where you arrange your cards,
+// A journal page: a sheet of paper in the binder where you arrange your cards,
 // badges, polaroids, stickers, washi tape and text however you like.
 //
 // Saved as { id, kind: 'journal', paper, items }. Each item is placed like a sticker

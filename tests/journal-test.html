@@ -12,6 +12,7 @@
 <script type="module">
 import { canShow, createPiece, newJournalPage, paperOf } from '/src/journal/JournalPage.js';
 import { placeInNextPocket } from '/src/storage/collection.js';
+import { openJournalEditor } from '/src/journal/JournalEditor.js';
 
 const out = document.getElementById('out');
 const results = [];
@@ -67,6 +68,14 @@ try {
   check('washi tape is wider than a sticker and grows with its scale', !!tape.querySelector('.tape--dots') && tape.style.width === '92%', tape.style.width);
   const binder = { layout: '2x2', pages: [{ id: 'j', kind: 'journal', paper: 'plain', items: [] }, { id: 'p', slots: [null, null, null, null] }] };
   check('new cards skip journal pages (they have no pockets)', placeInNextPocket(binder, 'x') === 2 && binder.pages[1].slots[0] === 'x');
+
+  // Things that couldn't be loaded this time are kept when the page is saved
+  let savedPage = null;
+  const aside = { id: 'm', kind: 'merch', merchId: 'not-loaded', x: 0.5, y: 0.5, scale: 1, rotation: 0 };
+  const dlg = openJournalEditor({ page: { id: 'j1', kind: 'journal', paper: 'dots', items: [aside] }, onSave: async (p) => { savedPage = p; } });
+  dlg.querySelector('.workshop__primary').click();
+  await until(() => savedPage);
+  check('saving keeps things whose badge / card didn\'t load', savedPage?.items.length === 1 && savedPage.items[0].merchId === 'not-loaded' && savedPage.paper === 'dots');
 
   // ---------- In the app ----------
   await new Promise((r) => { f.onload = r; f.src = '/index.html?memory&open'; });
@@ -130,9 +139,12 @@ try {
     layer.dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true, pointerId: id, isPrimary: true }));
   };
   press(pieces()[0], 3);
-  box.value = ''; // what you typed last stays in the box until a text is selected
+  check('leaving a text clears the box (so Add text doesn\'t copy it)', box.value === '');
   press(textPiece(), 4);
   check('selecting a text shows it in the box', box.value === 'Concert day!! ♡');
+  box.value = ''; box.dispatchEvent(new win.Event('input'));
+  check('an emptied text shows as … while you type a new one', textPiece()?.textContent === '…');
+  box.value = 'Concert day!! ♡'; box.dispatchEvent(new win.Event('input'));
 
   // Move the card
   const card = pieces()[0];

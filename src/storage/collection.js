@@ -97,9 +97,10 @@ export function saveMerch(item) {
 
 // Delete a badge or polaroid, and take it off any journal page it was on
 export async function deleteMerch(binder, id) {
-  const pages = withoutItems(binder, (item) => item.merchId === id);
+  const onAPage = journalUses(binder, (item) => item.merchId === id);
+  const pages = onAPage ? withoutItems(binder, (item) => item.merchId === id) : binder.pages;
   await writeMany([
-    { store: 'binders', value: { ...binder, pages } },
+    ...(onAPage ? [{ store: 'binders', value: { ...binder, pages } }] : []),
     { store: 'merch', deleteId: id },
   ]);
   binder.pages = pages; // only once it's safely saved
@@ -116,6 +117,11 @@ export async function deleteCard(binder, cardId) {
     { store: 'cards', deleteId: cardId },
   ]);
   binder.pages = pages; // only once it's safely saved
+}
+
+// Is anything matching on a journal page?
+export function journalUses(binder, matches) {
+  return binder.pages.some((page) => isJournal(page) && page.items.some(matches));
 }
 
 // A copy of the pages with the matching things taken off every journal page

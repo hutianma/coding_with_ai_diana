@@ -3,10 +3,9 @@
 // A live preview at the top; Save keeps it, Cancel doesn't.
 import { createJournalSurface, createPiece, canShow, paperOf, PAPERS, TAPES, TEXT_COLORS, TEXT_MAX } from './JournalPage.js';
 import { createStickerLayer } from '../decor/StickerLayer.js';
-import { BUILTIN_STICKERS, builtinUrl, shrinkSticker } from '../decor/stickers.js';
+import { createStickerPalette } from '../decor/stickerPalette.js';
 import { FONTS } from '../binder/CoverDesign.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
-import { pickPhotos } from '../workshop/pickPhotos.js';
 
 // page: the journal page to edit (a new one, or one from the binder; it isn't changed).
 // cards / merch: { id: thing }, to choose from.
@@ -14,12 +13,15 @@ import { pickPhotos } from '../workshop/pickPhotos.js';
 // onDelete(): delete the page (only offered for a page that's already in the binder).
 export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false, onSave, onDelete = null }) {
   const things = { cards, merch };
-  // Work on a copy; nothing changes until Save. Things whose card / badge was deleted are dropped.
+  // Work on a copy; nothing changes until Save. Things whose card / badge / polaroid can't
+  // be found (e.g. they didn't load this time) are kept aside and saved again unchanged:
+  // deleting a card or badge already takes it off every page.
   const draft = {
     ...page,
     paper: paperOf(page),
     items: page.items.filter((item) => canShow(item, things)).map((item) => ({ ...item })),
   };
+  const keptAside = page.items.filter((item) => !canShow(item, things) && (item.kind === 'card' || item.kind === 'merch'));
   const startImages = new Set(page.items.filter((s) => s.kind === 'image').map((s) => s.image));
   const cardList = Object.values(cards).filter((c) => c.front).sort((a, b) => a.createdAt - b.createdAt);
   const merchList = Object.values(merch).filter((m) => m.image).sort((a, b) => a.createdAt - b.createdAt);
@@ -54,11 +56,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
         </fieldset>
         <fieldset>
           <legend>Stickers</legend>
-          <div class="sticker-palette">
-            ${Object.entries(BUILTIN_STICKERS).map(([key, s]) => `
-              <button type="button" class="sticker-palette__item" data-sticker="${key}" aria-label="Add ${s.name} sticker"><img alt="" src="${builtinUrl(key)}"></button>`).join('')}
-            <button type="button" class="sticker-palette__item sticker-palette__upload" aria-label="Add your own image as a sticker">＋<small>Your image</small></button>
-          </div>
+          <div class="journal-editor__palette"></div>
         </fieldset>
         <fieldset>
           <legend>Washi tape</legend>
@@ -101,20 +99,13 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
 
   // ---------- Preview ----------
   // The paper is drawn here; everything on it is drawn by the sticker layer, so it can be moved
-  function drawPaper() {
-    const surface = createJournalSurface({ paper: draft.paper, items: [] }, things);
-    const old = preview.querySelector('.journal-surface');
-    if (old) {
-      // Keep the sticker layer (and what's selected): only the paper changes
-      old.className = surface.className;
-    } else {
-      preview.append(surface);
-    }
-  }
-  drawPaper();
+  const surface = createJournalSurface({ paper: draft.paper, items: [] }, things);
+  preview.append(surface);
+  const drawPaper = () => { surface.className = `journal-surface journal-paper--${paperOf(draft)}`; };
 
-  const layer = createStickerLayer(preview.querySelector('.journal-surface'), draft.items, {
-    render: (item) => createPiece(item, things),
+  // An emptied text (while you type a new one) shows as "…", so it doesn't vanish
+  const layer = createStickerLayer(surface, draft.items, {
+    render: (item) => createPiece(item.kind === 'text' && !item.text.trim() ? { ...item, text: '…' } : item, things),
     placeNew: 'scatter',
     onSelect: showTextFor,
   });
@@ -175,26 +166,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
   }
 
   // ---------- Stickers and tape ----------
-  dialog.querySelector('.sticker-palette').addEventListener('click', async (event) => {
-    const item = event.target.closest('.sticker-palette__item');
-    if (!item) return;
-    if (item.dataset.sticker) {
-      layer.add('builtin', item.dataset.sticker);
-      return;
-    }
-    const [file] = await pickPhotos();
-    if (!file) return;
-    setBusy(true); // Save / Cancel wait until the sticker is ready
-    try {
-      const image = await shrinkSticker(file);
-      if (dialog.isConnected) layer.add('image', image);
-      showError('');
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  });
+  $('.journal-editor__palette').replaceWith(createStickerPalette(layer, { setBusy, showError, isOpen: () => dialog.isConnected }));
 
   $('.journal-editor__tapes').addEventListener('click', (event) => {
     const btn = event.target.closest('[data-tape]');
@@ -204,13 +176,17 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
   // ---------- Text ----------
   // With a text selected on the page, the box and choices change it; otherwise they're
   // for the next text you add
+  let textWasSelected = false;
   function showTextFor(item) {
     const isText = item?.kind === 'text';
     if (isText) {
       textInput.value = item.text;
       textStyle.font = item.font ?? FONTS[0].value;
       textStyle.color = item.color ?? TEXT_COLORS[0].value;
+    } else if (textWasSelected) {
+      textInput.value = ''; // ready for a new text (not a copy of the one you just left)
     }
+    textWasSelected = isText;
     checkTextStyle();
     textInput.setAttribute('aria-label', isText ? 'Change the selected text' : 'Text');
   }
@@ -227,8 +203,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
     const selected = layer.selected;
     if (selected?.kind !== 'text') return;
     selected.text = textInput.value.slice(0, TEXT_MAX);
-    // An emptied text stays until Save (so you can type a new one); it isn't drawn meanwhile
-    if (selected.text.trim()) layer.redraw(selected);
+    layer.redraw(selected); // an emptied text is left out when the page is saved
   });
 
   $('.journal-editor__add-text').addEventListener('click', () => {
@@ -272,7 +247,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
     try {
       // A copy, so later changes in this (closing) editor can't reach the saved page.
       // Emptied texts are left out.
-      const items = draft.items.filter((item) => canShow(item, things)).map((item) => ({ ...item }));
+      const items = [...keptAside, ...draft.items.filter((item) => canShow(item, things))].map((item) => ({ ...item }));
       await onSave({ id: draft.id, kind: 'journal', paper: draft.paper, items });
       close(imagesIn(items));
     } catch (err) {

@@ -2,10 +2,8 @@
 // of your cards, and stickers. A live preview at the top; Save keeps it, Cancel doesn't.
 import { decorateCover, coverOf, placeTitle, MATERIALS, COVER_COLORS, FONTS, WINDOW_SHAPES, TITLE_SIZE } from './CoverDesign.js';
 import { createStickerLayer } from '../decor/StickerLayer.js';
-import { BUILTIN_STICKERS, builtinUrl } from '../decor/stickers.js';
+import { createStickerPalette } from '../decor/stickerPalette.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
-import { pickPhotos } from '../workshop/pickPhotos.js';
-import { shrinkSticker } from '../decor/stickers.js';
 
 const NAME_MAX = 40;
 
@@ -76,11 +74,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
         </fieldset>
         <fieldset class="cover-editor__stickers">
           <legend>Stickers <small>(tap to add, then drag on the cover)</small></legend>
-          <div class="sticker-palette">
-            ${Object.entries(BUILTIN_STICKERS).map(([key, s]) => `
-              <button type="button" class="sticker-palette__item" data-sticker="${key}" aria-label="Add ${s.name} sticker"><img alt="" src="${builtinUrl(key)}"></button>`).join('')}
-            <button type="button" class="sticker-palette__item sticker-palette__upload" aria-label="Add your own image as a sticker">＋<small>Your image</small></button>
-          </div>
+          <div class="cover-editor__palette"></div>
         </fieldset>
       </div>
     </div>
@@ -251,26 +245,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
   }
 
   // Stickers
-  dialog.querySelector('.sticker-palette').addEventListener('click', async (event) => {
-    const item = event.target.closest('.sticker-palette__item');
-    if (!item) return;
-    if (item.dataset.sticker) {
-      stickerLayer.add('builtin', item.dataset.sticker);
-      return;
-    }
-    const [file] = await pickPhotos();
-    if (!file) return;
-    setBusy(true); // Save / Cancel wait until the sticker is ready
-    try {
-      const image = await shrinkSticker(file);
-      if (dialog.isConnected) stickerLayer.add('image', image);
-      showError('');
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  });
+  $('.cover-editor__palette').replaceWith(createStickerPalette(stickerLayer, { setBusy, showError, isOpen: () => dialog.isConnected }));
 
   // ---------- Save / cancel ----------
   function showError(message) {
