@@ -246,7 +246,10 @@ export class PageFlip {
     if (!t || !this.touchStart || event.touches.length > 1) return; // two fingers: let pinch-zoom happen
     const dx = t.clientX - this.touchStart.x;
     const dy = t.clientY - this.touchStart.y;
-    if (this.gesture?.dir || Math.abs(dx) > Math.abs(dy)) event.preventDefault();
+    // Only once it's clearly sideways (a few px, more across than down), so a vertical
+    // scroll that starts with a tiny wobble still scrolls
+    const sideways = Math.abs(dx) >= 6 && Math.abs(dx) > Math.abs(dy);
+    if (this.gesture?.dir || sideways) event.preventDefault();
   };
 
   // 0 = flat on the right, 1 = flat on the left. Dragging one page width turns the page fully on
@@ -388,7 +391,7 @@ export class PageFlip {
     });
     this.shadowLeft.style.opacity = this.shadowRight.style.opacity = 0;
     this.setClosed(this.cover && this.current === 0 ? 1 : 0);
-    this.el.classList.remove('is-turning');
+    if (!this.isDragging) this.el.classList.remove('is-turning');
     this.onSettle?.(this.current);
   }
 

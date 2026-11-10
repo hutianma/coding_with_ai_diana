@@ -413,17 +413,12 @@
   }
 }
 
-/* ---------- While a page is turning: switch off effects phones struggle with ---------- */
+/* ---------- While a page is turning ----------
+   Most effects are drawn once and then moved as a whole, so they cost nothing extra.
+   The blur behind a frosted cover is different: it is recalculated every frame as the
+   cover moves, which phones can't keep up with, so it becomes a plain tint meanwhile. */
 .book.is-turning .cover-design--frosted {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background-color: color-mix(in srgb, var(--cover-color) 55%, #fff);
+  background-color: color-mix(in srgb, var(--cover-color) 40%, rgba(255, 255, 255, 0.75));
 }
-
-.book.is-turning .card--holo::after,
-.book.is-turning .cover-design::before {
-  mix-blend-mode: normal;
-  opacity: 0.15;
-}
-
-.book.is-turning .sticker img { filter: none; }
