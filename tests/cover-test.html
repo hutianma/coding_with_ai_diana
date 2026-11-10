@@ -1,0 +1,145 @@
+<!--
+  Automated cover-design tests (M7): the cover editor, stickers and saving.
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/cover-test.html  → every line should say PASS.
+  Uses made-up test pictures, never real photos. Runs with ?memory (no saved data touched).
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Cover tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script type="module">
+import { coverOf, defaultCover } from '/src/binder/CoverDesign.js';
+import { builtinUrl, BUILTIN_STICKERS } from '/src/decor/stickers.js';
+
+const out = document.getElementById('out');
+const results = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+let win, doc;
+
+async function until(test, ms = 8000) {
+  for (let t = 0; t < ms; t += 50) { if (test()) return true; await wait(50); }
+  return false;
+}
+
+function testPicture(hue) {
+  const c = document.createElement('canvas'); c.width = 900; c.height = 1300;
+  const g = c.getContext('2d'); g.fillStyle = `hsl(${hue} 80% 50%)`; g.fillRect(0, 0, 900, 1300);
+  return new Promise((r) => c.toBlob((b) => r(new File([b], 'p.png', { type: 'image/png' })), 'image/png'));
+}
+
+async function givePhoto(hue) {
+  await until(() => doc.querySelector('input.photo-picker'));
+  const input = doc.querySelector('input.photo-picker');
+  const dt = new win.DataTransfer();
+  dt.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));
+  input.files = dt.files;
+  input.dispatchEvent(new win.Event('change'));
+}
+
+const editor = () => doc.querySelector('dialog.cover-editor[open]');
+const coverFace = () => doc.querySelector('.cover-face');
+const set = (name, value) => doc.querySelector(`dialog.cover-editor input[name="${name}"][value="${value}"]`).click();
+
+try {
+  // ---------- Pure helpers ----------
+  check('older binders (only a color) still get a full cover design', coverOf({ coverColor: '#123456' }).color === '#123456' && coverOf({}).material === 'pastel');
+  check('every built-in sticker makes an image', Object.keys(BUILTIN_STICKERS).every((k) => builtinUrl(k).startsWith('data:image/svg+xml')));
+
+  // ---------- Make a card so the window has something to show ----------
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?memory'; });
+  win = f.contentWindow; doc = win.document;
+  await until(() => doc.querySelector('.book'), 20000);
+  check('closed binder shows ✎ Edit cover', !doc.querySelector('.toolbar__edit').hidden && doc.querySelector('.toolbar__back').hidden);
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
+  await givePhoto(0);
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  for (let i = 0; i < 3; i++) { doc.querySelector('dialog[open] .workshop__primary').click(); await wait(400); }
+  await until(() => !doc.querySelector('dialog[open]'));
+  check('open binder: "‹ Cover" instead of Edit cover', doc.querySelector('.toolbar__edit').hidden && !doc.querySelector('.toolbar__back').hidden);
+  doc.querySelector('.toolbar__back').click();
+  await until(() => !doc.querySelector('.toolbar__edit').hidden, 3000);
+
+  // ---------- The editor ----------
+  doc.querySelector('.toolbar__edit').click();
+  await until(() => editor());
+  const preview = () => doc.querySelector('.cover-editor__design');
+  check('the editor opens with a live preview', !!preview() && preview().classList.contains('cover-design--pastel'));
+
+  set('material', 'leather');
+  check('choosing Leather changes the preview', preview().classList.contains('cover-design--leather'));
+  set('color', '#2b2230');
+  check('a dark color switches to light text', preview().classList.contains('cover-design--dark'));
+  set('font', 'classic');
+  check('the font shows in the preview', /Georgia/.test(preview().querySelector('.cover-design__title').style.fontFamily));
+  const name = doc.querySelector('dialog.cover-editor input[name="name"]');
+  name.value = '<b>My</b> 앨범'; name.dispatchEvent(new win.Event('input'));
+  check('the name is shown as plain text', preview().querySelector('.cover-design__title').textContent === '<b>My</b> 앨범' && !preview().querySelector('b'));
+
+  check('window: shapes are hidden until a card is chosen', doc.querySelector('.window-shapes').hidden);
+  doc.querySelectorAll('.cover-editor__card')[1].click();
+  set('shape', 'heart');
+  const winEl = preview().querySelector('.cover-design__window');
+  check('choosing a card puts it in a heart window', !!winEl && winEl.classList.contains('cover-design__window--heart') && !!winEl.querySelector('img')?.src);
+
+  // Stickers: add, move, resize, turn, delete
+  doc.querySelector('[data-sticker="heart"]').click();
+  doc.querySelector('[data-sticker="star"]').click();
+  const stickers = () => doc.querySelectorAll('.cover-editor__preview .sticker-layer .sticker');
+  check('tapping stickers adds them', stickers().length === 2);
+  const s0 = stickers()[0];
+  const before = { left: parseFloat(s0.style.left), top: parseFloat(s0.style.top) };
+  const r = s0.getBoundingClientRect();
+  const layer = doc.querySelector('.cover-editor__preview .sticker-layer');
+  const pe = (type, x, y) => (type === 'pointerdown' ? s0 : layer).dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 8, isPrimary: true, clientX: x, clientY: y }));
+  pe('pointerdown', r.left + r.width / 2, r.top + r.height / 2);
+  pe('pointermove', r.left + r.width / 2 + 20, r.top + r.height / 2 + 10);
+  pe('pointerup', r.left + r.width / 2 + 20, r.top + r.height / 2 + 10);
+  const moved = doc.querySelectorAll('.cover-editor__preview .sticker-layer .sticker')[0];
+  check('dragging a sticker moves it', parseFloat(moved.style.left) > before.left && parseFloat(moved.style.top) > before.top, `${before.left},${before.top} → ${moved.style.left},${moved.style.top}`);
+  const widthBefore = parseFloat(moved.style.width);
+  doc.querySelector('[data-tool="bigger"]').click();
+  check('+ makes the selected sticker bigger', parseFloat(stickers()[0].style.width) > widthBefore);
+  doc.querySelector('[data-tool="right"]').click();
+  check('⟳ turns it', /rotate\(-?\d/.test(stickers()[0].style.transform));
+  doc.querySelector('[data-tool="delete"]').click();
+  check('✕ removes it', stickers().length === 1);
+
+  // Your own image as a sticker
+  doc.querySelector('.sticker-palette__upload').click();
+  await givePhoto(120);
+  await until(() => stickers().length === 2);
+  check('your own image becomes a sticker', stickers().length === 2 && stickers()[1].querySelector('img').src.startsWith('blob:'));
+
+  // ---------- Save ----------
+  doc.querySelector('dialog.cover-editor .workshop__primary').click();
+  await until(() => !editor());
+  await wait(300);
+  const face = coverFace();
+  check('saved: the cover is leather and dark', face.classList.contains('cover-design--leather') && face.classList.contains('cover-design--dark'));
+  check('saved: the new name (as plain text)', face.querySelector('.cover-design__title').textContent === '<b>My</b> 앨범' && !face.querySelector('b'));
+  check('saved: the card window and 2 stickers', !!face.querySelector('.cover-design__window--heart img') && face.querySelectorAll('.sticker').length === 2);
+  check('saved: the toolbar shows the new name', doc.querySelector('.toolbar__title').textContent === '<b>My</b> 앨범');
+
+  // ---------- Cancel keeps the old design ----------
+  doc.querySelector('.toolbar__edit').click();
+  await until(() => editor());
+  check('reopening shows the saved settings', doc.querySelector('dialog.cover-editor input[name="material"]:checked')?.value === 'leather'
+    && doc.querySelector('dialog.cover-editor input[name="name"]').value === '<b>My</b> 앨범');
+  set('material', 'glitter');
+  doc.querySelector('[data-sticker="crown"]').click();
+  doc.querySelector('dialog.cover-editor .workshop__secondary').click();
+  await until(() => !editor());
+  check('Cancel keeps the saved cover', coverFace().classList.contains('cover-design--leather') && coverFace().querySelectorAll('.sticker').length === 2);
+
+  // The cover still opens like a page
+  coverFace().click();
+  await until(() => doc.querySelector('.page-nav__label').textContent.startsWith('Page'), 3000);
+  check('the decorated cover still opens the binder', doc.querySelector('.page-nav__label').textContent === 'Page 1 of 1');
+} catch (e) {
+  results.push('ERROR ' + e.stack);
+}
+out.textContent = results.join('\n');
+out.dataset.done = 1;
+</script>
