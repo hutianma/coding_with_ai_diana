@@ -10,72 +10,118 @@
 
 .cover-design--dark { color: #f6eef2; --ink-on-cover: #f6eef2; }
 
+/* Textures are tiny generated noise images (SVG, nothing to download): they give real
+   grain instead of a regular pattern. */
+
 /* Pastel: soft and matte */
 .cover-design--pastel {
   background: var(--cover-color);
   background:
-    radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.55), transparent 55%),
-    linear-gradient(150deg, var(--cover-color), color-mix(in srgb, var(--cover-color) 75%, #8a3d63));
+    radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.5), transparent 55%),
+    linear-gradient(150deg, var(--cover-color), color-mix(in srgb, var(--cover-color) 80%, #8a3d63));
 }
 
-/* Leather: a fine grain, a darker edge, and stitching */
-.cover-design--leather {
+/* PU leather: smooth faux leather with a fine pebbled grain, a soft sheen, and a
+   pressed edge with neat stitching */
+.cover-design--pu {
   background: var(--cover-color);
   background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.25), transparent 50%),
-    radial-gradient(circle, rgba(0, 0, 0, 0.09) 0 0.6px, transparent 1.1px) 0 0 / 3px 3px,
-    radial-gradient(circle, rgba(255, 255, 255, 0.07) 0 0.6px, transparent 1.1px) 1px 2px / 5px 4px,
-    radial-gradient(circle, rgba(0, 0, 0, 0.06) 0 0.8px, transparent 1.4px) 2px 1px / 7px 6px,
-    radial-gradient(circle at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.22) 100%),
-    var(--cover-color);
+    linear-gradient(115deg, transparent 20%, rgba(255, 255, 255, 0.22) 38%, rgba(255, 255, 255, 0.05) 50%, transparent 62%),
+    radial-gradient(ellipse at 30% 10%, rgba(255, 255, 255, 0.28), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 160px 160px,
+    linear-gradient(160deg, color-mix(in srgb, var(--cover-color) 92%, #fff), color-mix(in srgb, var(--cover-color) 82%, #000));
+  background-blend-mode: normal, normal, soft-light, normal;
+  box-shadow: inset 0 0 0 1.2cqi color-mix(in srgb, var(--cover-color) 85%, #000), inset 0 0 3cqi rgba(0, 0, 0, 0.2);
 }
 
-.cover-design--leather::before {
+.cover-design--pu::before {
   content: "";
   position: absolute;
-  inset: 4.5cqi;
-  border: 0.6cqi dashed color-mix(in srgb, var(--cover-color) 40%, #fff);
-  border-radius: 3cqi;
+  inset: 3.6cqi;
+  border: 0.45cqi dashed color-mix(in srgb, var(--cover-color) 55%, #fff);
+  border-radius: 2.4cqi;
+  opacity: 0.8;
   pointer-events: none;
 }
 
-/* Glitter: tiny sparkles all over, and a shine */
+/* Glitter: a dense glitter sheet: white and tinted flecks everywhere, with a shimmer */
 .cover-design--glitter {
   background: var(--cover-color);
   background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 0.5px, transparent 1.2px) 0 0 / 9px 9px,
-    radial-gradient(circle, rgba(255, 240, 250, 0.8) 0 0.6px, transparent 1.3px) 4px 5px / 13px 11px,
-    radial-gradient(circle, rgba(255, 255, 210, 0.7) 0 0.7px, transparent 1.4px) 7px 2px / 17px 19px,
-    linear-gradient(135deg, color-mix(in srgb, var(--cover-color) 80%, #fff), var(--cover-color) 50%, color-mix(in srgb, var(--cover-color) 80%, #6b3a5c));
+    linear-gradient(120deg, transparent 22%, rgba(255, 255, 255, 0.45) 40%, transparent 56%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 7 -4.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 110px 110px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 0.85  0 0 0 0 0.95  0 0 0 8 -5.6'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 31px 47px / 80px 80px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 7 -4.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 63px 19px / 60px 60px,
+    radial-gradient(circle at 75% 85%, color-mix(in srgb, var(--cover-color) 65%, #fff), transparent 60%),
+    linear-gradient(140deg, color-mix(in srgb, var(--cover-color) 80%, #fff), color-mix(in srgb, var(--cover-color) 80%, #4a2a5a));
 }
 
-.cover-design--glitter::before {
+/* Furry: soft, fluffy faux fur — fine light and dark fuzz in the cover's own color,
+   very gentle patches of light, and a soft glowing edge */
+.cover-design--furry {
+  background: var(--cover-color);
+  background:
+    radial-gradient(ellipse at 35% 18%, rgba(255, 255, 255, 0.35), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 -0.32'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 120px 120px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.6 0.32'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 60px 40px / 120px 120px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.05' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.45 -0.12'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 320px 320px,
+    radial-gradient(circle at 50% 50%, transparent 60%, color-mix(in srgb, var(--cover-color) 80%, #000) 140%),
+    var(--cover-color);
+  box-shadow: inset 0 0 3cqi 1cqi rgba(255, 255, 255, 0.45);
+}
+
+.cover-design--furry::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.45) 45%, transparent 60%);
+  /* the fluffy edge: a soft, uneven halo */
+  box-shadow: inset 0 0 1.5cqi 0.6cqi color-mix(in srgb, var(--cover-color) 60%, #fff);
+  filter: blur(0.6px);
+  pointer-events: none;
+}
+
+/* Frosted: tinted, frosted plastic — the first page shows through, softly */
+.cover-design--frosted {
+  background: color-mix(in srgb, var(--cover-color) 35%, rgba(255, 255, 255, 0.5));
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.55), transparent 30%, rgba(255, 255, 255, 0.15) 55%, transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 160px 160px,
+    color-mix(in srgb, var(--cover-color) 30%, rgba(255, 255, 255, 0.45));
+  -webkit-backdrop-filter: blur(5px) saturate(1.1);
+  backdrop-filter: blur(5px) saturate(1.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), inset 0 0 4cqi rgba(255, 255, 255, 0.35);
+}
+
+/* Pearl: a pearly sheen that shifts through soft pinks, lilacs, mints and peaches,
+   with glossy highlights, like 珠光 paper */
+.cover-design--pearl {
+  background: var(--cover-color);
+  background:
+    linear-gradient(115deg, transparent 10%, rgba(255, 255, 255, 0.8) 24%, transparent 38%),
+    linear-gradient(115deg, transparent 52%, rgba(255, 255, 255, 0.5) 64%, transparent 76%),
+    linear-gradient(160deg,
+      rgba(255, 160, 210, 0.55), rgba(200, 175, 255, 0.5) 25%, rgba(160, 225, 255, 0.45) 45%,
+      rgba(175, 250, 215, 0.45) 62%, rgba(255, 220, 170, 0.5) 80%, rgba(255, 170, 205, 0.55)),
+    var(--cover-color);
+  box-shadow: inset 0 0 5cqi rgba(255, 255, 255, 0.65), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
+.cover-design--pearl::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* a second, slanted rainbow, so the colors shimmer instead of banding */
+  background: linear-gradient(60deg, rgba(255, 255, 255, 0.25), rgba(255, 190, 230, 0.3) 30%, rgba(190, 230, 255, 0.3) 60%, rgba(255, 255, 255, 0.25));
   mix-blend-mode: soft-light;
   pointer-events: none;
 }
 
-/* Clear: tinted, frosted plastic — you can see the first page through it */
-.cover-design--clear {
-  background: color-mix(in srgb, var(--cover-color) 35%, transparent);
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.5), transparent 35%, rgba(255, 255, 255, 0.18) 60%, transparent 75%),
-    color-mix(in srgb, var(--cover-color) 35%, transparent);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-}
-
-/* Title */
+/* Title: placed by its centre (left/top set in CoverDesign.js), so it can be dragged */
 .cover-design__label {
   position: absolute;
   z-index: 1;
-  top: 10%;
-  left: 10%;
-  right: 10%;
+  width: 80%;
+  transform: translate(-50%, -50%);
   display: grid;
   gap: 1cqi;
   padding: 3.5cqi 3cqi;
@@ -86,11 +132,11 @@
 }
 
 .cover-design--dark .cover-design__label { background: rgba(0, 0, 0, 0.25); }
-.cover-design--clear .cover-design__label { background: rgba(255, 255, 255, 0.75); color: #4a2a3a; }
+.cover-design--frosted .cover-design__label { background: rgba(255, 255, 255, 0.7); color: #4a2a3a; }
 
 .cover-design__title {
   font-size: 1.4rem; /* fallback for older Safari */
-  font-size: clamp(0.95rem, 8.5cqi, 2rem);
+  font-size: calc(clamp(0.95rem, 8.5cqi, 2rem) * var(--title-size, 1));
   font-weight: 700;
   line-height: 1.15;
   overflow-wrap: anywhere;
@@ -101,9 +147,6 @@
   font-size: clamp(0.7rem, 3.8cqi, 1rem);
   opacity: 0.75;
 }
-
-/* With a card in the window, the title moves up a little */
-.cover-design--has-window .cover-design__label { top: 6%; }
 
 /* Window with one of your cards */
 .cover-design__window {
@@ -232,6 +275,9 @@
   position: absolute;
   inset: 0;
 }
+
+.cover-editor__design .cover-design__label { cursor: grab; }
+.cover-editor__design .cover-design__label:focus-visible { outline: 2px dashed var(--accent); outline-offset: 2px; }
 
 .cover-editor__controls {
   display: grid;

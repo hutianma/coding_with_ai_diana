@@ -1,6 +1,6 @@
 // Design your binder's cover: name and font, material and color, a window with one
 // of your cards, and stickers. A live preview at the top; Save keeps it, Cancel doesn't.
-import { decorateCover, coverOf, MATERIALS, COVER_COLORS, FONTS, WINDOW_SHAPES } from './CoverDesign.js';
+import { decorateCover, coverOf, placeTitle, MATERIALS, COVER_COLORS, FONTS, WINDOW_SHAPES, TITLE_SIZE } from './CoverDesign.js';
 import { createStickerLayer } from '../decor/StickerLayer.js';
 import { BUILTIN_STICKERS, builtinUrl } from '../decor/stickers.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
@@ -19,7 +19,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
   const startWindow = start.window && cards[start.window.cardId] ? { ...start.window } : null;
   const draft = {
     name: binder.name,
-    cover: { ...start, window: startWindow, stickers: start.stickers.map((s) => ({ ...s })) },
+    cover: { ...start, title: { ...start.title }, window: startWindow, stickers: start.stickers.map((s) => ({ ...s })) },
   };
   const startImages = new Set(start.stickers.filter((s) => s.kind === 'image').map((s) => s.image));
 
@@ -41,6 +41,11 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
           <span>Name</span>
           <input type="text" name="name" maxlength="${NAME_MAX}" autocomplete="off">
         </label>
+        <label class="workshop__zoom">
+          <span>Title size</span>
+          <input type="range" name="title-size" min="${TITLE_SIZE.min}" max="${TITLE_SIZE.max}" step="0.05">
+        </label>
+        <p class="workshop__hint">Drag the title on the cover to move it</p>
         <fieldset class="patterns fonts">
           <legend>Font</legend>
           ${FONTS.map((f) => `
@@ -98,6 +103,52 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     design.replaceChildren();
     // Stickers are drawn by the sticker layer on top, so they can be moved
     decorateCover(design, { name: draft.name || ' ', cover: { ...draft.cover, stickers: [] } }, cards);
+    const label = design.querySelector('.cover-design__label');
+    label.tabIndex = 0;
+    label.setAttribute('role', 'button');
+    label.setAttribute('aria-label', 'Title: drag, or use the arrow keys, to move it');
+  }
+
+  // ---------- Moving the title ----------
+  // The sticker layer sits on top, so catch presses on the title before it does
+  let titleDrag = null;
+  preview.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.sticker')) return;
+    const label = design.querySelector('.cover-design__label');
+    const r = label.getBoundingClientRect();
+    if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) return;
+    event.stopPropagation();
+    event.preventDefault();
+    titleDrag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    try { preview.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
+  }, { capture: true });
+  preview.addEventListener('pointermove', (event) => {
+    if (!titleDrag || event.pointerId !== titleDrag.id) return;
+    const r = preview.getBoundingClientRect();
+    moveTitle((event.clientX - titleDrag.x) / r.width, (event.clientY - titleDrag.y) / r.height);
+    titleDrag.x = event.clientX;
+    titleDrag.y = event.clientY;
+  }, { capture: true });
+  const endTitleDrag = (event) => {
+    if (titleDrag && event.pointerId === titleDrag.id) titleDrag = null;
+  };
+  preview.addEventListener('pointerup', endTitleDrag, { capture: true });
+  preview.addEventListener('pointercancel', endTitleDrag, { capture: true });
+
+  design.addEventListener('keydown', (event) => {
+    if (!event.target.classList.contains('cover-design__label')) return;
+    const step = event.shiftKey ? 0.05 : 0.01;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (!moves[event.key]) return;
+    event.preventDefault();
+    moveTitle(...moves[event.key]);
+  });
+
+  function moveTitle(dx, dy) {
+    const t = draft.cover.title;
+    t.x = Math.min(0.9, Math.max(0.1, t.x + dx));
+    t.y = Math.min(0.95, Math.max(0.05, t.y + dy));
+    placeTitle(design.querySelector('.cover-design__label'), t);
   }
 
   const stickerLayer = createStickerLayer(preview, draft.cover.stickers);
@@ -119,6 +170,11 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
   check('material', draft.cover.material);
   check('color', draft.cover.color);
   check('shape', draft.cover.window?.shape ?? 'rounded');
+  $('input[name="title-size"]').value = draft.cover.title.size;
+  $('input[name="title-size"]').addEventListener('input', (event) => {
+    draft.cover.title.size = Number(event.target.value);
+    placeTitle(design.querySelector('.cover-design__label'), draft.cover.title);
+  });
   $('input[name="custom-color"]').value = toHex(draft.cover.color);
 
   dialog.addEventListener('change', (event) => {
@@ -240,7 +296,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     showError('');
     try {
       // A copy, so later changes in this (closing) editor can't reach the saved cover
-      const cover = { ...draft.cover, window: draft.cover.window ? { ...draft.cover.window } : null, stickers: draft.cover.stickers.map((s) => ({ ...s })) };
+      const cover = { ...draft.cover, title: { ...draft.cover.title }, window: draft.cover.window ? { ...draft.cover.window } : null, stickers: draft.cover.stickers.map((s) => ({ ...s })) };
       await onSave({ name: draft.name.trim() || binder.name, cover });
       close(true);
     } catch (err) {
