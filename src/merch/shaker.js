@@ -26,7 +26,7 @@ const STYLES = {
   hearts: { count: 62, size: [20, 32], weight: [0.75, 1.3], flutter: 0.008, colors: ['#ff6fa8', '#ff9ec4', '#ffc2d9'] },
   sakura: { count: 56, size: [20, 30], weight: [0.5, 0.95], flutter: 0.025, colors: ['#ffc4d8', '#ffd9e6', '#ffb0cb'] },
   // Fine gold powder: lots of tiny flecks that sparkle and hang in the gel
-  gold: { count: 440, size: [2.5, 6], weight: [0.4, 0.75], flutter: 0.01, overlap: 0.6, dust: true, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
+  gold: { count: 440, size: [2.5, 6], weight: [0.5, 0.8], flutter: 0.01, overlap: 0.6, dust: true, colors: ['#ffd76a', '#f5c542', '#ffe9a8', '#e8b33a', '#fff6d6'] },
 };
 
 // How the gel behaves (speeds in px per frame on a 600 px badge)
@@ -35,8 +35,10 @@ const FOLLOW = 0.09; // how quickly a piece takes on the gel's motion (lower = m
 const FLOW_CALM = 0.965; // the gel's sloshing dies down a little every frame…
 const SPIN_CALM = 0.975; // …and so does its turning…
 const STIR_CALM = 0.985; // …and its swirls
-const EDDY_SPEED = 5.5; // how fast the swirls move pieces when fully stirred
+const EDDY_SPEED = 7; // how fast the swirls move pieces when fully stirred
 const MAX_FLOW = 16; // the fastest the gel sloshes
+const MAX_SPIN = 0.006; // the fastest the gel turns (radians per frame)
+const MAX_SPEED = 24; // the fastest any piece moves (px per frame), so nothing jumps
 const SLEEP_FRAMES = 30; // still for half a second → asleep
 const QUIET = 0.0036; // average movement under 0.06 px a frame counts as still (far too small to see)
 const RIM = 0.9; // pieces stay within 90% of the radius (inside the rim)
@@ -77,22 +79,26 @@ export function createShaker(canvas, { fill, seed = 1 }) {
   let stir = 0; // 0 = calm, 1 = well stirred
   // Several swirls of different sizes, so different parts of the badge move differently
   // and a layer of pieces breaks up into a cloud instead of lifting as one sheet
+  // (their own random numbers, so the pieces' layout doesn't depend on them)
+  const gelRandom = seeded(seed ^ 0x5bd1e995);
   const eddies = Array.from({ length: 4 }, (_, i) => ({
-    kx: (Math.PI * (1.5 + i * 0.6 + random())) / size,
-    ky: (Math.PI * (1.5 + i * 0.6 + random())) / size,
-    px: random() * Math.PI * 2,
-    py: random() * Math.PI * 2,
-    driftX: (random() - 0.5) * 0.012,
-    driftY: (random() - 0.5) * 0.012,
-    amp: 0.6 + random() * 0.8,
+    kx: (Math.PI * (1.5 + i * 0.6 + gelRandom())) / size,
+    ky: (Math.PI * (1.5 + i * 0.6 + gelRandom())) / size,
+    px: gelRandom() * Math.PI * 2,
+    py: gelRandom() * Math.PI * 2,
+    driftX: (gelRandom() - 0.5) * 0.012,
+    driftY: (gelRandom() - 0.5) * 0.012,
+    amp: 0.6 + gelRandom() * 0.8,
   }));
+  const gel = { u: 0, v: 0 }; // reused for every piece (no garbage each frame)
 
-  // How the gel is moving at a point. The swirls come from a "stream function", which
-  // keeps the motion smooth and never squeezes pieces together or pulls them apart.
+  // How the gel is moving at a point (written into `gel`). The swirls come from a
+  // "stream function", which keeps the motion smooth and never squeezes pieces together
+  // or pulls them apart.
   function gelAt(x, y) {
     let u = flow.x - (y - center) * spin;
     let v = flow.y + (x - center) * spin;
-    if (stir > 0.002) {
+    if (stir > 0) {
       for (const e of eddies) {
         const ax = e.kx * x + e.px;
         const ay = e.ky * y + e.py;
@@ -102,11 +108,12 @@ export function createShaker(canvas, { fill, seed = 1 }) {
         v -= speed * (e.kx / kn) * Math.cos(ax) * Math.sin(ay);
       }
     }
-    return { u, v };
+    gel.u = u;
+    gel.v = v;
   }
 
   function gelIsCalm() {
-    return Math.hypot(flow.x, flow.y) < 0.05 * k && stir < 0.02 && Math.abs(spin) < 0.0002;
+    return flow.x === 0 && flow.y === 0 && stir === 0 && spin === 0;
   }
 
   const pieces = !style ? [] : Array.from({ length: style.count }, () => {
@@ -126,13 +133,13 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       weight: style.weight[0] + random() * (style.weight[1] - style.weight[0]),
       // Its own side-to-side drift
       flutter: style.flutter * (0.5 + random()),
-      // How readily it goes with the gel: lighter pieces more, heavier ones lag behind,
-      // so a stirred cloud spreads out
-      follow: FOLLOW * (1.4 - 0.5 * (style.weight[0] + random() * (style.weight[1] - style.weight[0]))),
       freq: 0.015 + random() * 0.025, // slow, gentle rocking
       phase: random() * Math.PI * 2,
     };
   });
+  // How readily each piece goes with the gel: lighter pieces more, heavier ones lag
+  // behind, and each a little differently, so a stirred layer breaks up into a cloud
+  for (const p of pieces) p.follow = FOLLOW * (1.4 - 0.5 * p.weight) * (0.75 + 0.5 * gelRandom());
 
   function step() {
     time++;
@@ -141,6 +148,10 @@ export function createShaker(canvas, { fill, seed = 1 }) {
     flow.y *= FLOW_CALM;
     spin *= SPIN_CALM;
     stir *= STIR_CALM;
+    // Once the leftovers are too small to see, the gel is simply still
+    if (Math.hypot(flow.x, flow.y) < 0.05 * k) flow.x = flow.y = 0;
+    if (Math.abs(spin) < 0.0002) spin = 0;
+    if (stir < 0.02) stir = 0;
     for (const e of eddies) {
       e.px += e.driftX;
       e.py += e.driftY;
@@ -158,7 +169,7 @@ export function createShaker(canvas, { fill, seed = 1 }) {
         continue;
       }
       // Where the gel would carry it, plus its own slow sinking and a gentle rocking
-      const gel = gelAt(p.x, p.y);
+      gelAt(p.x, p.y);
       const sink = SINK_SPEED * p.weight * k;
       const falling = Math.min(1, (p.moved ?? 1) / (1.5 * k));
       const sway = Math.sin(time * p.freq + p.phase) * p.flutter * falling * 20 * k;
@@ -167,6 +178,11 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       // Ease into that motion: pieces have a little inertia, so everything stays smooth
       p.vx += (targetX - p.vx) * p.follow;
       p.vy += (targetY - p.vy) * p.follow;
+      const speed = Math.hypot(p.vx, p.vy);
+      if (speed > MAX_SPEED * k) {
+        p.vx *= (MAX_SPEED * k) / speed;
+        p.vy *= (MAX_SPEED * k) / speed;
+      }
       p.x += p.vx;
       p.y += p.vy;
       p.rot += p.spin + p.vx * 0.01;
@@ -208,8 +224,10 @@ export function createShaker(canvas, { fill, seed = 1 }) {
         p.vy *= 0.9;
         // …and when it's only creeping, it sticks (static friction), so a pile on the
         // curved bottom stays put instead of slowly sliding and re-settling forever
-        // (only when it's barely moving: slow-sinking pieces still slide down the wall)
-        if (Math.hypot(p.vx, p.vy) < 0.12 * k) p.vx = p.vy = 0;
+        // (only at the bottom, in a calm gel, when it's barely moving: on the sloping
+        // sides, or when you tilt the phone, pieces still slide down the wall)
+        const atBottom = nx * gravity.x + ny * gravity.y > 0.85;
+        if (atBottom && gelIsCalm() && Math.hypot(p.vx, p.vy) < 0.12 * k) p.vx = p.vy = 0;
       }
     }
   }
@@ -343,8 +361,6 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       }
     },
 
-    // The badge moved by (dx, dy) canvas pixels: the pieces lag behind, so they're
-    // pushed the other way (a little differently each, so they spread out)
     // The badge moved by (dx, dy) canvas px (a finger or the phone): the gel and its
     // contents lag behind, sloshing the other way, and it gets a little stirred up
     push(dx, dy) {
@@ -354,18 +370,19 @@ export function createShaker(canvas, { fill, seed = 1 }) {
       limitFlow();
       const amount = Math.hypot(dx, dy) / (20 * k);
       stir = Math.min(1.5, stir + amount * 0.25);
-      spin += swirlDir * amount * 0.0006;
+      spin = Math.max(-MAX_SPIN, Math.min(MAX_SPIN, spin + swirlDir * Math.min(amount, 3) * 0.0006));
       this.start();
     },
 
-    // A good shake: the gel surges up (against gravity), turns, and swirls
-    shake() {
+    // A good shake: the gel surges up (against gravity), turns, and swirls.
+    // strength: 1 = a normal shake
+    shake(strength = 1) {
       wakeAll();
-      flow.x -= gravity.x * 7 * k;
-      flow.y -= gravity.y * 7 * k;
+      flow.x -= gravity.x * 7 * k * strength;
+      flow.y -= gravity.y * 7 * k * strength;
       limitFlow();
-      stir = Math.min(1.5, stir + 1.1);
-      spin += swirlDir * 0.003;
+      stir = Math.min(1.5, stir + 1.1 * strength);
+      spin = Math.max(-MAX_SPIN, Math.min(MAX_SPIN, spin + swirlDir * 0.003 * strength));
       this.start();
     },
 
