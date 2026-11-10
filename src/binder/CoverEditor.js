@@ -106,7 +106,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     const label = design.querySelector('.cover-design__label');
     label.tabIndex = 0;
     label.setAttribute('role', 'button');
-    label.setAttribute('aria-label', 'Title: drag, or use the arrow keys, to move it');
+    label.setAttribute('aria-label', `${draft.name}. Title: drag, or use the arrow keys, to move it`);
   }
 
   // ---------- Moving the title ----------
@@ -144,11 +144,16 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     moveTitle(...moves[event.key]);
   });
 
+  // Keep the whole title on the cover (it's placed by its centre)
   function moveTitle(dx, dy) {
     const t = draft.cover.title;
-    t.x = Math.min(0.9, Math.max(0.1, t.x + dx));
-    t.y = Math.min(0.95, Math.max(0.05, t.y + dy));
-    placeTitle(design.querySelector('.cover-design__label'), t);
+    const label = design.querySelector('.cover-design__label');
+    const box = preview.getBoundingClientRect();
+    const halfW = Math.min(0.5, label.offsetWidth / 2 / box.width);
+    const halfH = Math.min(0.5, label.offsetHeight / 2 / box.height);
+    t.x = Math.min(1 - halfW, Math.max(halfW, t.x + dx));
+    t.y = Math.min(1 - halfH, Math.max(halfH, t.y + dy));
+    placeTitle(label, t);
   }
 
   const stickerLayer = createStickerLayer(preview, draft.cover.stickers);

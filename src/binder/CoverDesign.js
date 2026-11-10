@@ -55,7 +55,9 @@ export function coverOf(binder) {
   const cover = { ...defaultCover(binder.coverColor), ...(binder.cover ?? {}) };
   cover.material = RENAMED[cover.material] ?? cover.material;
   if (!MATERIALS.some((m) => m.value === cover.material)) cover.material = 'pastel';
-  cover.title = { ...DEFAULT_TITLE, ...(cover.title ?? {}) };
+  // Covers saved before the title could move: above the window if there is one
+  const startY = binder.cover?.window && !binder.cover?.title ? 0.1 : DEFAULT_TITLE.y;
+  cover.title = { ...DEFAULT_TITLE, y: startY, ...(cover.title ?? {}) };
   return cover;
 }
 
@@ -72,7 +74,6 @@ export function decorateCover(el, binder, cards = {}, { count = null } = {}) {
   el.classList.toggle('cover-design--dark', isDark(cover.color));
 
   const windowCard = cover.window ? cards[cover.window.cardId] : null;
-  el.classList.toggle('cover-design--has-window', Boolean(windowCard));
 
   const label = document.createElement('span');
   label.className = 'cover-design__label';
