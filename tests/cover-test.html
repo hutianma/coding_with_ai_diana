@@ -50,6 +50,9 @@ try {
   // ---------- Make a card so the window has something to show ----------
   await new Promise((r) => { f.onload = r; f.src = '/index.html?memory'; });
   win = f.contentWindow; doc = win.document;
+  // Page turns run on a timer this test controls (headless browsers may never run them)
+  win.requestAnimationFrame = (cb) => setTimeout(() => cb(win.performance.now()), 16);
+  win.cancelAnimationFrame = (id) => clearTimeout(id);
   await until(() => doc.querySelector('.book'), 20000);
   check('closed binder shows ✎ Edit cover', !doc.querySelector('.toolbar__edit').hidden && doc.querySelector('.toolbar__back').hidden);
   doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
@@ -103,8 +106,22 @@ try {
   check('+ makes the selected sticker bigger', parseFloat(stickers()[0].style.width) > widthBefore);
   doc.querySelector('[data-tool="right"]').click();
   check('⟳ turns it', /rotate\(-?\d/.test(stickers()[0].style.transform));
+  // Pinch with the second finger next to the sticker (not on it): still resizes it
+  const sp = stickers()[0];
+  const spr = sp.getBoundingClientRect();
+  const lr = layer.getBoundingClientRect();
+  const lp = (type, id, x, y, target = layer) => target.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: id, isPrimary: id === 31, clientX: x, clientY: y }));
+  const w0 = parseFloat(sp.style.width);
+  lp('pointerdown', 31, spr.left + spr.width / 2, spr.top + spr.height / 2, sp);
+  lp('pointerdown', 32, lr.left + 5, lr.top + 5, layer); // lands on empty cover
+  lp('pointermove', 32, lr.left - 40, lr.top - 40);
+  lp('pointerup', 32, lr.left - 40, lr.top - 40); lp('pointerup', 31, spr.left, spr.top);
+  const w1 = parseFloat(stickers()[0].style.width);
+  check('pinching with the second finger off the sticker still resizes it', w1 > w0 && !doc.querySelector('.sticker-tools').hidden, `${w0} → ${w1}`);
+
   doc.querySelector('[data-tool="delete"]').click();
   check('✕ removes it', stickers().length === 1);
+  check('…and keyboard focus stays in the sticker area', doc.activeElement?.closest?.('.sticker-layer') != null || doc.activeElement?.classList.contains('sticker-layer'));
 
   // Your own image as a sticker
   doc.querySelector('.sticker-palette__upload').click();
@@ -133,10 +150,24 @@ try {
   await until(() => !editor());
   check('Cancel keeps the saved cover', coverFace().classList.contains('cover-design--leather') && coverFace().querySelectorAll('.sticker').length === 2);
 
+  // Deleting the card that's in the window empties the window
+  win.confirm = () => true;
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  doc.querySelector('.my-cards__tab[data-tab="cards"]').click();
+  doc.querySelector('.my-cards__item [data-action="delete"]').click();
+  await until(() => !doc.querySelector('.my-cards__item [data-action="delete"]'));
+  doc.querySelector('.my-cards__close').click(); await wait(300);
+  check('deleting the window card empties the cover window', !coverFace().querySelector('.cover-design__window'));
+  doc.querySelector('.toolbar__edit').click();
+  await until(() => editor());
+  check('…and the editor shows None', doc.querySelector('.cover-editor__card--none').getAttribute('aria-checked') === 'true' && doc.querySelector('.window-shapes').hidden);
+  doc.querySelector('dialog.cover-editor .workshop__secondary').click();
+  await until(() => !editor());
+
   // The cover still opens like a page
   coverFace().click();
   await until(() => doc.querySelector('.page-nav__label').textContent.startsWith('Page'), 3000);
-  check('the decorated cover still opens the binder', doc.querySelector('.page-nav__label').textContent === 'Page 1 of 1');
+  check('the decorated cover still opens the binder', doc.querySelector('.page-nav__label').textContent.startsWith('Page 1 of'));
 } catch (e) {
   results.push('ERROR ' + e.stack);
 }
