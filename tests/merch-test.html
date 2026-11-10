@@ -189,7 +189,7 @@ try {
   await until(() => doc.querySelector('.book'), 20000);
   doc.querySelector('[data-action="new"]').click(); await wait(100);
   const options = [...doc.querySelectorAll('.make-menu [data-make]')].map((o) => o.dataset.make).join();
-  check('＋ New offers photocard, badge and polaroid', options === 'card,badge,polaroid', options);
+  check('＋ New offers photocard, badge, polaroid and journal page', options === 'card,badge,polaroid,journal', options);
 
   // ---------- Badge ----------
   doc.querySelector('[data-make="badge"]').click();

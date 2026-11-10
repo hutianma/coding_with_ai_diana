@@ -1,0 +1,207 @@
+<!--
+  Automated journal page tests (M8): adding a journal page, putting things on it,
+  editing, saving and deleting.
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/journal-test.html  → every line should say PASS.
+  Uses made-up test pictures, never real photos. Runs with ?memory (no saved data touched).
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Journal tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script type="module">
+import { canShow, createPiece, newJournalPage, paperOf } from '/src/journal/JournalPage.js';
+import { placeInNextPocket } from '/src/storage/collection.js';
+
+const out = document.getElementById('out');
+const results = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+let win, doc;
+
+async function until(test, ms = 8000) {
+  for (let t = 0; t < ms; t += 50) { if (test()) return true; await wait(50); }
+  return false;
+}
+
+function testPicture(hue) {
+  const c = document.createElement('canvas'); c.width = 900; c.height = 1300;
+  const g = c.getContext('2d'); g.fillStyle = `hsl(${hue} 80% 50%)`; g.fillRect(0, 0, 900, 1300);
+  return new Promise((r) => c.toBlob((b) => r(new File([b], 'p.png', { type: 'image/png' })), 'image/png'));
+}
+
+async function givePhoto(hue) {
+  await until(() => doc.querySelector('input.photo-picker'));
+  const input = doc.querySelector('input.photo-picker');
+  const dt = new win.DataTransfer();
+  dt.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));
+  input.files = dt.files;
+  input.dispatchEvent(new win.Event('change'));
+}
+
+async function makeCard(hue) {
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
+  await givePhoto(hue);
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  for (let i = 0; i < 3; i++) { doc.querySelector('dialog[open] .workshop__primary').click(); await wait(400); }
+  await until(() => !doc.querySelector('dialog[open]'));
+}
+
+const editor = () => doc.querySelector('dialog.journal-editor[open]');
+const pieces = (root = doc.querySelector('.journal-editor__preview')) => [...(root?.querySelectorAll('.sticker-layer > .sticker') ?? [])];
+const journalPage = () => doc.querySelector('.leaf__face--front .page--journal');
+const label = () => doc.querySelector('.page-nav__label').textContent;
+
+try {
+  // ---------- Pure helpers ----------
+  const fresh = newJournalPage();
+  check('a new journal page is lined paper with nothing on it', fresh.kind === 'journal' && fresh.paper === 'lined' && fresh.items.length === 0);
+  check('an unknown paper falls back to plain', paperOf({ paper: 'nope' }) === 'plain');
+  const things = { cards: { c1: { id: 'c1', front: new Blob() } }, merch: {} };
+  check('a card that was deleted is not shown', canShow({ kind: 'card', cardId: 'c1' }, things) && !canShow({ kind: 'card', cardId: 'gone' }, things)
+    && createPiece({ kind: 'card', cardId: 'gone', x: 0.5, y: 0.5, scale: 1, rotation: 0 }, things) === null);
+  check('empty text is not shown', !canShow({ kind: 'text', text: '  ' }));
+  const text = createPiece({ id: 't', kind: 'text', text: '<b>hi</b>', x: 0.5, y: 0.5, scale: 1.5, rotation: 0 });
+  check('text is plain text and sized with --scale', text.textContent === '<b>hi</b>' && !text.querySelector('b') && text.style.getPropertyValue('--scale') === '1.5' && !text.style.width);
+  const tape = createPiece({ id: 'w', kind: 'tape', pattern: 'dots', x: 0.5, y: 0.5, scale: 2, rotation: 0 });
+  check('washi tape is wider than a sticker and grows with its scale', !!tape.querySelector('.tape--dots') && tape.style.width === '92%', tape.style.width);
+  const binder = { layout: '2x2', pages: [{ id: 'j', kind: 'journal', paper: 'plain', items: [] }, { id: 'p', slots: [null, null, null, null] }] };
+  check('new cards skip journal pages (they have no pockets)', placeInNextPocket(binder, 'x') === 2 && binder.pages[1].slots[0] === 'x');
+
+  // ---------- In the app ----------
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?memory&open'; });
+  win = f.contentWindow; doc = win.document;
+  // Page turns run on a timer this test controls (headless browsers may never run them)
+  win.requestAnimationFrame = (cb) => setTimeout(() => cb(win.performance.now()), 16);
+  win.cancelAnimationFrame = (id) => clearTimeout(id);
+  win.confirm = () => true;
+  await until(() => doc.querySelector('.book'), 20000);
+
+  await makeCard(0);
+  // A badge (no fill, to keep it quick)
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="badge"]').click();
+  await givePhoto(240);
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  doc.querySelector('dialog[open] .workshop__primary').click();
+  await until(() => doc.querySelector('.badge-preview .badge'));
+  doc.querySelector('input[name="fill"][value="none"]').click();
+  doc.querySelector('dialog[open] .workshop__primary').click();
+  await until(() => doc.querySelector('dialog.my-cards[open]'), 15000);
+  doc.querySelector('.my-cards__close').click();
+  await until(() => !doc.querySelector('dialog[open]'));
+  check('set up: one card and one badge', label() === 'Page 1 of 1', label());
+
+  // ---------- A new journal page ----------
+  doc.querySelector('[data-action="new"]').click(); await wait(100);
+  check('＋ New offers a journal page', !!doc.querySelector('.make-menu [data-make="journal"]'));
+  doc.querySelector('[data-make="journal"]').click();
+  await until(() => editor());
+  check('the journal editor opens on lined paper', doc.querySelector('#journal-editor-title').textContent === 'New journal page'
+    && !!doc.querySelector('.journal-editor__preview .journal-paper--lined') && !doc.querySelector('.journal-editor__delete'));
+  doc.querySelector('dialog.journal-editor input[name="paper"][value="grid"]').click();
+  check('choosing grid paper changes the preview', !!doc.querySelector('.journal-editor__preview .journal-paper--grid'));
+
+  doc.querySelector('.journal-editor__thing--card').click();
+  doc.querySelector('.journal-editor__thing--badge').click();
+  doc.querySelector('dialog.journal-editor [data-sticker="heart"]').click();
+  doc.querySelector('[data-tape="dots"]').click();
+  check('cards, badges, stickers and tape can be added', pieces().length === 4
+    && !!pieces()[0].querySelector('.card') && !!pieces()[1].querySelector('.badge') && !!pieces()[3].querySelector('.tape--dots'));
+  check('the newest thing is selected, ready to move', pieces()[3].classList.contains('is-selected') && !doc.querySelector('.journal-editor .sticker-tools').hidden);
+
+  // Text: add, then change it while it's selected
+  const box = doc.querySelector('dialog.journal-editor textarea[name="text"]');
+  doc.querySelector('.journal-editor__add-text').click();
+  check('Add text with an empty box adds nothing', pieces().length === 4);
+  box.value = 'Concert day ♡'; box.dispatchEvent(new win.Event('input'));
+  doc.querySelector('dialog.journal-editor input[name="text-color"][value="#d9608f"]').click();
+  doc.querySelector('.journal-editor__add-text').click();
+  const textPiece = () => pieces().find((p) => p.classList.contains('piece--text'));
+  check('Add text puts the text on the page in the chosen color', textPiece()?.textContent === 'Concert day ♡' && textPiece().querySelector('.piece__text').style.color === 'rgb(217, 96, 143)');
+  box.value = 'Concert day!! ♡'; box.dispatchEvent(new win.Event('input'));
+  doc.querySelector('dialog.journal-editor input[name="font"][value="handwritten"]').click();
+  check('with a text selected, typing and fonts change it', textPiece().textContent === 'Concert day!! ♡' && /Noteworthy/.test(textPiece().querySelector('.piece__text').style.fontFamily) && pieces().length === 5);
+
+  // Selecting another thing, then the text again, fills the box with that text
+  const layer = doc.querySelector('.journal-editor__preview .sticker-layer');
+  const press = (el, id) => {
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, pointerId: id, isPrimary: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+    layer.dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true, pointerId: id, isPrimary: true }));
+  };
+  press(pieces()[0], 3);
+  box.value = ''; // what you typed last stays in the box until a text is selected
+  press(textPiece(), 4);
+  check('selecting a text shows it in the box', box.value === 'Concert day!! ♡');
+
+  // Move the card
+  const card = pieces()[0];
+  const before = parseFloat(card.style.left);
+  const r = card.getBoundingClientRect();
+  card.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, pointerId: 5, isPrimary: true, clientX: r.left + 5, clientY: r.top + 5 }));
+  layer.dispatchEvent(new win.PointerEvent('pointermove', { bubbles: true, pointerId: 5, isPrimary: true, clientX: r.left + 35, clientY: r.top + 5 }));
+  layer.dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true, pointerId: 5, isPrimary: true }));
+  check('dragging the card moves it', parseFloat(pieces()[0].style.left) > before + 5);
+
+  // ---------- Save ----------
+  doc.querySelector('dialog.journal-editor .workshop__primary').click();
+  await until(() => !editor());
+  await until(() => journalPage(), 3000);
+  check('saved: the binder opens at the new page, right after page 1', label() === 'Page 2 of 2', label());
+  const page = journalPage();
+  check('saved: grid paper with everything on it', !!page?.querySelector('.journal-paper--grid') && page.querySelectorAll('.journal-surface__items > .sticker').length === 5);
+  check('saved: the text shows as plain text', page.querySelector('.piece--text').textContent === 'Concert day!! ♡');
+  check('saved: things stay where they were put', Math.abs(parseFloat(page.querySelector('.piece--card').style.left) - parseFloat(card.style.left)) < 0.01);
+  check('the page has a ✎ button', !!page.querySelector('.journal-page__edit'));
+
+  // Pick up the card from the page
+  page.querySelector('.piece--card .card').click();
+  await until(() => doc.querySelector('dialog.viewer[open]'));
+  check('tapping the card on the page picks it up', !!doc.querySelector('dialog.viewer[open]'));
+  doc.querySelector('.viewer__close').click();
+  await until(() => !doc.querySelector('dialog.viewer[open]'), 3000);
+
+  // ---------- Edit again; Cancel keeps it as it was ----------
+  journalPage().querySelector('.journal-page__edit').click();
+  await until(() => editor());
+  check('✎ opens the page with its paper and things', doc.querySelector('#journal-editor-title').textContent === 'Edit journal page'
+    && doc.querySelector('dialog.journal-editor input[name="paper"]:checked')?.value === 'grid' && pieces().length === 5 && !!doc.querySelector('.journal-editor__delete'));
+  doc.querySelector('dialog.journal-editor [data-sticker="star"]').click();
+  doc.querySelector('dialog.journal-editor input[name="paper"][value="kraft"]').click();
+  doc.querySelector('.journal-editor__cancel').click();
+  await until(() => !editor());
+  check('Cancel keeps the saved page', !!journalPage().querySelector('.journal-paper--grid') && journalPage().querySelectorAll('.journal-surface__items > .sticker').length === 5);
+
+  // ---------- New cards still go into pockets ----------
+  await makeCard(120);
+  check('a new card goes into a pocket on page 1, not the journal page', label() === 'Page 1 of 2' && doc.querySelectorAll('.leaf__face--front .page--2x2 .card').length >= 2, label());
+
+  // ---------- Deleting things takes them off the page ----------
+  doc.querySelector('[data-action="list"]').click(); await wait(100);
+  doc.querySelector('.my-cards__tab[data-tab="badges"]').click();
+  doc.querySelector('.my-cards__item [data-action="delete"]').click();
+  await until(() => !doc.querySelector('.my-cards__item [data-action="delete"]'));
+  doc.querySelector('.my-cards__tab[data-tab="cards"]').click();
+  doc.querySelector('.my-cards__item [data-action="delete"]').click(); // the first card (the one on the page)
+  await wait(500);
+  doc.querySelector('.my-cards__close').click();
+  await until(() => !doc.querySelector('dialog[open]'));
+  doc.querySelector('[data-dir="next"]').click();
+  await until(() => journalPage(), 3000);
+  await wait(1000); // let the page finish turning (✎ is ignored mid-turn)
+  check('deleting a badge or card takes it off the journal page', journalPage()?.querySelectorAll('.journal-surface__items > .sticker').length === 3
+    && !journalPage().querySelector('.piece--card') && !journalPage().querySelector('.piece--badge'));
+
+  // ---------- Delete the page ----------
+  journalPage().querySelector('.journal-page__edit').click();
+  await until(() => editor());
+  doc.querySelector('.journal-editor__delete').click();
+  await until(() => !editor());
+  await wait(300);
+  check('Delete page removes it from the binder', !doc.querySelector('.page--journal') && label() === 'Page 1 of 1', label());
+} catch (e) {
+  results.push('ERROR ' + e.stack);
+}
+out.textContent = results.join('\n');
+out.dataset.done = 1;
+</script>
