@@ -149,7 +149,7 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
       if (card) openCardViewer(card, el);
     } else {
       const item = binder.merch?.[el.dataset.merchId];
-      if (item) openMerchViewer(item, el);
+      if (item) openMerchViewer(item, el, { cards: binder.cards });
     }
   }
   stage.addEventListener('click', (event) => {
