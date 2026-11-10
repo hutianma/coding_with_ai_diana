@@ -123,7 +123,7 @@ async function start() {
   }
 
   async function onDeleteMerch(item) {
-    await deleteMerch(item.id);
+    await deleteMerch(binder, item.id);
     releaseImage(item.image);
     releaseImage(item.caption);
     delete merch[item.id];

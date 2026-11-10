@@ -214,7 +214,7 @@ function createInsideCover() {
 
 function countCards(binder) {
   return binder.pages.reduce(
-    (sum, page) => sum + page.slots.filter(Boolean).length,
+    (sum, page) => sum + (page.slots?.filter(Boolean).length ?? 0),
     0,
   );
 }
