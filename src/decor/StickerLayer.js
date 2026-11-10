@@ -161,14 +161,16 @@ export function createStickerLayer(surface, stickers, { onChange = () => {} } = 
   return {
     tools, // put this element wherever the editor wants its sticker buttons
 
-    // Add a sticker in the middle, a little tilted, and select it
+    // Add a sticker somewhere around the edges (not on top of the middle), a little
+    // tilted, and select it so it can be moved straight away
     add(kind, value) {
+      const angle = Math.random() * Math.PI * 2;
       const sticker = {
         id: makeId('sticker'),
         kind,
         ...(kind === 'image' ? { image: value } : { name: value }),
-        x: 0.5 + (Math.random() - 0.5) * 0.2,
-        y: 0.45 + (Math.random() - 0.5) * 0.2,
+        x: 0.5 + Math.cos(angle) * (0.25 + Math.random() * 0.1),
+        y: 0.55 + Math.sin(angle) * (0.3 + Math.random() * 0.08),
         scale: 1,
         rotation: Math.round((Math.random() - 0.5) * 24),
       };

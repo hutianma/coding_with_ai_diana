@@ -1,7 +1,8 @@
 // App entry point: load your cards and show your binder.
 import { createSampleBinder } from './data/sampleBinder.js';
 import { mountBinder } from './binder/Binder.js';
-import { loadCollection, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch } from './storage/collection.js';
+import { loadCollection, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign } from './storage/collection.js';
+import { openCoverEditor } from './binder/CoverEditor.js';
 import { askToKeepData, savingIsAvailable } from './storage/db.js';
 import { releaseImage } from './cards/imageUrls.js';
 import { pickPhotosForNewCards, editCard } from './workshop/Workshop.js';
@@ -56,11 +57,23 @@ async function start() {
     } else if (!hasCards) {
       notice = createNotice('These are sample cards. Tap “＋ New” to make your own from your photos.');
     }
-    view = mountBinder(app, hasCards ? { ...binder, cards } : createSampleBinder(), {
+    // Until you've made a card, the sample cards are shown in your binder's own cover
+    const shown = hasCards
+      ? { ...binder, cards }
+      : { ...createSampleBinder(), name: binder.name, cover: binder.cover, coverColor: binder.coverColor };
+    view = mountBinder(app, shown, {
       startPage: page,
       fadeIn,
       toolbarEnd: createActions(),
       notice,
+      onEditCover: () => openCoverEditor({
+        binder,
+        cards,
+        onSave: async (design) => {
+          await saveBinderDesign(binder, design);
+          show(0);
+        },
+      }),
     });
   }
 

@@ -1,0 +1,258 @@
+// Design your binder's cover: name and font, material and color, a window with one
+// of your cards, and stickers. A live preview at the top; Save keeps it, Cancel doesn't.
+import { decorateCover, coverOf, MATERIALS, COVER_COLORS, FONTS, WINDOW_SHAPES } from './CoverDesign.js';
+import { createStickerLayer } from '../decor/StickerLayer.js';
+import { BUILTIN_STICKERS, builtinUrl } from '../decor/stickers.js';
+import { imageUrl } from '../cards/imageUrls.js';
+import { pickPhotos } from '../workshop/pickPhotos.js';
+import { loadImage, unloadImage, canvasToBlob } from '../workshop/imageTools.js';
+
+const NAME_MAX = 40;
+const STICKER_IMAGE_MAX = 400; // your own sticker images are kept at most 400 px
+
+// onSave({ name, cover }) must save it (and may throw if saving fails)
+export function openCoverEditor({ binder, cards = {}, onSave }) {
+  // Work on a copy; nothing changes until Save
+  const start = coverOf(binder);
+  const draft = {
+    name: binder.name,
+    cover: { ...start, window: start.window ? { ...start.window } : null, stickers: start.stickers.map((s) => ({ ...s })) },
+  };
+  const cardList = Object.values(cards).filter((c) => c.front).sort((a, b) => a.createdAt - b.createdAt);
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'workshop cover-editor';
+  dialog.setAttribute('aria-labelledby', 'cover-editor-title');
+  dialog.innerHTML = `
+    <header class="workshop__header">
+      <h2 id="cover-editor-title" class="workshop__title">Edit cover</h2>
+      <button class="workshop__close" type="button" aria-label="Close">✕</button>
+    </header>
+    <div class="cover-editor__body">
+      <div class="cover-editor__stage">
+        <div class="cover-editor__preview"><div class="cover-editor__design"></div></div>
+        <div class="cover-editor__sticker-tools"></div>
+      </div>
+      <div class="cover-editor__controls">
+        <label class="workshop__text">
+          <span>Name</span>
+          <input type="text" name="name" maxlength="${NAME_MAX}" autocomplete="off">
+        </label>
+        <fieldset class="patterns fonts">
+          <legend>Font</legend>
+          ${FONTS.map((f) => `
+            <label class="pattern"><input type="radio" name="font" value="${f.value}"><span style="font-family:${f.css.replace(/"/g, '&quot;')}">${f.name}</span></label>`).join('')}
+        </fieldset>
+        <fieldset class="patterns">
+          <legend>Material</legend>
+          ${MATERIALS.map((m) => `
+            <label class="pattern"><input type="radio" name="material" value="${m.value}"><span>${m.name}</span></label>`).join('')}
+        </fieldset>
+        <fieldset class="swatches">
+          <legend>Color</legend>
+          ${COVER_COLORS.map((c) => `
+            <label class="swatch" style="--swatch:${c.value}">
+              <input type="radio" name="color" value="${c.value}">
+              <span class="visually-hidden">${c.name}</span>
+            </label>`).join('')}
+          <label class="swatch swatch--custom" title="Any color">
+            <input type="color" name="custom-color" aria-label="Any color">
+          </label>
+        </fieldset>
+        <fieldset class="cover-editor__window">
+          <legend>Window</legend>
+          <div class="cover-editor__cards" role="radiogroup" aria-label="Card in the window"></div>
+          <div class="patterns window-shapes">
+            ${WINDOW_SHAPES.map((w) => `
+              <label class="pattern"><input type="radio" name="shape" value="${w.value}"><span>${w.name}</span></label>`).join('')}
+          </div>
+        </fieldset>
+        <fieldset class="cover-editor__stickers">
+          <legend>Stickers <small>(tap to add, then drag on the cover)</small></legend>
+          <div class="sticker-palette">
+            ${Object.entries(BUILTIN_STICKERS).map(([key, s]) => `
+              <button type="button" class="sticker-palette__item" data-sticker="${key}" aria-label="Add ${s.name} sticker"><img alt="" src="${builtinUrl(key)}"></button>`).join('')}
+            <button type="button" class="sticker-palette__item sticker-palette__upload" aria-label="Add your own image as a sticker">＋<small>Your image</small></button>
+          </div>
+        </fieldset>
+      </div>
+    </div>
+    <p class="workshop__error" role="alert" hidden></p>
+    <footer class="workshop__footer">
+      <button class="workshop__secondary" type="button">Cancel</button>
+      <button class="workshop__primary" type="button">Save cover</button>
+    </footer>
+  `;
+  const $ = (sel) => dialog.querySelector(sel);
+  const preview = $('.cover-editor__preview');
+  const design = $('.cover-editor__design');
+  const errorEl = $('.workshop__error');
+  let busy = false;
+
+  // ---------- Preview ----------
+  function drawDesign() {
+    design.className = 'cover-editor__design';
+    design.replaceChildren();
+    // Stickers are drawn by the sticker layer on top, so they can be moved
+    decorateCover(design, { name: draft.name || ' ', cover: { ...draft.cover, stickers: [] } }, cards);
+  }
+
+  const stickerLayer = createStickerLayer(preview, draft.cover.stickers);
+  $('.cover-editor__sticker-tools').append(stickerLayer.tools);
+
+  // ---------- Settings ----------
+  const nameInput = $('input[name="name"]');
+  nameInput.value = draft.name;
+  nameInput.addEventListener('input', () => {
+    draft.name = nameInput.value.slice(0, NAME_MAX);
+    drawDesign();
+  });
+
+  function check(name, value) {
+    const input = dialog.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (input) input.checked = true;
+  }
+  check('font', draft.cover.font);
+  check('material', draft.cover.material);
+  check('color', draft.cover.color);
+  check('shape', draft.cover.window?.shape ?? 'rounded');
+  $('input[name="custom-color"]').value = toHex(draft.cover.color);
+
+  dialog.addEventListener('change', (event) => {
+    const { name, value } = event.target;
+    if (name === 'font') draft.cover.font = value;
+    if (name === 'material') draft.cover.material = value;
+    if (name === 'color' || name === 'custom-color') {
+      draft.cover.color = value;
+      if (name === 'custom-color') dialog.querySelectorAll('input[name="color"]').forEach((i) => { i.checked = false; });
+    }
+    if (name === 'shape' && draft.cover.window) draft.cover.window.shape = value;
+    drawDesign();
+  });
+  $('input[name="custom-color"]').addEventListener('input', (event) => {
+    draft.cover.color = event.target.value;
+    drawDesign();
+  });
+
+  // Window: none, or one of your cards
+  const cardsBox = $('.cover-editor__cards');
+  function drawCardChoices() {
+    const current = draft.cover.window?.cardId ?? null;
+    const none = document.createElement('button');
+    none.type = 'button';
+    none.className = 'cover-editor__card cover-editor__card--none';
+    none.setAttribute('role', 'radio');
+    none.setAttribute('aria-checked', String(!current));
+    none.textContent = 'None';
+    none.addEventListener('click', () => {
+      draft.cover.window = null;
+      drawCardChoices();
+      drawDesign();
+    });
+    const items = cardList.map((card, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cover-editor__card';
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('aria-checked', String(card.id === current));
+      btn.setAttribute('aria-label', card.back?.text || `Card ${i + 1}`);
+      const img = document.createElement('img');
+      img.alt = '';
+      img.src = imageUrl(card.front);
+      btn.append(img);
+      btn.addEventListener('click', () => {
+        const shape = dialog.querySelector('input[name="shape"]:checked')?.value ?? 'rounded';
+        draft.cover.window = { cardId: card.id, shape };
+        drawCardChoices();
+        drawDesign();
+      });
+      return btn;
+    });
+    cardsBox.replaceChildren(none, ...items);
+    if (!cardList.length) {
+      const hint = document.createElement('p');
+      hint.className = 'workshop__hint';
+      hint.textContent = 'Make a photocard first to show it in the window.';
+      cardsBox.append(hint);
+    }
+    $('.window-shapes').hidden = !draft.cover.window;
+  }
+
+  // Stickers
+  dialog.querySelector('.sticker-palette').addEventListener('click', async (event) => {
+    const item = event.target.closest('.sticker-palette__item');
+    if (!item) return;
+    if (item.dataset.sticker) {
+      stickerLayer.add('builtin', item.dataset.sticker);
+      return;
+    }
+    const [file] = await pickPhotos();
+    if (!file) return;
+    try {
+      stickerLayer.add('image', await shrinkSticker(file));
+      showError('');
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+
+  // ---------- Save / cancel ----------
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.hidden = !message;
+  }
+
+  function close() {
+    dialog.close();
+    dialog.remove();
+  }
+
+  $('.workshop__primary').addEventListener('click', async () => {
+    if (busy) return;
+    busy = true;
+    $('.workshop__primary').disabled = $('.workshop__secondary').disabled = true;
+    showError('');
+    try {
+      await onSave({ name: draft.name.trim() || binder.name, cover: draft.cover });
+      close();
+    } catch (err) {
+      showError(`Couldn't save the cover. ${err.message ?? ''}`.trim());
+    } finally {
+      busy = false;
+      $('.workshop__primary').disabled = $('.workshop__secondary').disabled = false;
+    }
+  });
+  $('.workshop__secondary').addEventListener('click', () => { if (!busy) close(); });
+  $('.workshop__close').addEventListener('click', () => { if (!busy) close(); });
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    if (!busy) close();
+  });
+
+  document.body.append(dialog);
+  drawDesign();
+  drawCardChoices();
+  dialog.showModal();
+  return dialog;
+}
+
+// Your own sticker image: at most 400 px, kept as PNG so transparent parts stay transparent
+async function shrinkSticker(file) {
+  const img = await loadImage(file);
+  try {
+    const scale = Math.min(1, STICKER_IMAGE_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await canvasToBlob(canvas, 'image/png');
+  } finally {
+    unloadImage(img);
+  }
+}
+
+// <input type="color"> only takes #rrggbb
+function toHex(color) {
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : '#f2b8cc';
+}
+
