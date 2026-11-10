@@ -1,0 +1,275 @@
+/* ---------- Journal pages (手帐) ----------
+   The paper fills the page; things on it are placed like stickers (decor.css), as
+   fractions of the page, so they look the same in the editor and in the binder. */
+
+.page--journal {
+  display: block;
+  padding: 0;
+}
+
+.journal-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  container-type: inline-size; /* text and shadows scale with the page */
+}
+
+.journal-surface__items {
+  position: absolute;
+  inset: 0;
+}
+
+/* Shading near the spine, on top of the paper (like the pocket pages) */
+.leaf__face--front .journal-surface::after,
+.leaf__face--back .journal-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.07), transparent 12%);
+}
+.leaf__face--back .journal-surface::after { background: linear-gradient(270deg, rgba(0, 0, 0, 0.07), transparent 12%); }
+
+/* Papers: always light, even in dark mode (it's paper) */
+.journal-paper--plain { background: #fffdf8; }
+
+.journal-paper--lined {
+  background:
+    linear-gradient(90deg, transparent 12%, #f4b6c8 12%, #f4b6c8 calc(12% + 1px), transparent 0),
+    linear-gradient(180deg, transparent calc(100% - 1px), #cfe0f2 0) 0 2.5% / 100% 4.4%,
+    #fffdf8;
+}
+
+.journal-paper--grid {
+  background:
+    linear-gradient(90deg, #e3dbe8 1px, transparent 0) 0 0 / 6.25% 4.31%,
+    linear-gradient(180deg, #e3dbe8 1px, transparent 0) 0 0 / 6.25% 4.31%,
+    #fffdf8;
+}
+
+.journal-paper--dots {
+  background:
+    radial-gradient(circle, #d6c6d2 0 1.2px, transparent 1.7px) 0 0 / 6.25% 4.31%,
+    #fffdf8;
+}
+
+.journal-paper--kraft {
+  background:
+    var(--noise-grain) 0 0 / 160px 160px,
+    linear-gradient(160deg, rgba(255, 255, 255, 0.18), transparent 60%),
+    #d9b98f;
+}
+
+.journal-paper--floral {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cg fill='%23f7c3d4'%3E%3Ccircle cx='12' cy='9' r='3.2'/%3E%3Ccircle cx='17' cy='13' r='3.2'/%3E%3Ccircle cx='15' cy='19' r='3.2'/%3E%3Ccircle cx='9' cy='19' r='3.2'/%3E%3Ccircle cx='7' cy='13' r='3.2'/%3E%3C/g%3E%3Ccircle cx='12' cy='14' r='2.2' fill='%23ffe08a'/%3E%3Cg fill='%23d6cbff'%3E%3Ccircle cx='42' cy='38' r='2.6'/%3E%3Ccircle cx='46' cy='41' r='2.6'/%3E%3Ccircle cx='44.5' cy='46' r='2.6'/%3E%3Ccircle cx='39.5' cy='46' r='2.6'/%3E%3Ccircle cx='38' cy='41' r='2.6'/%3E%3C/g%3E%3Ccircle cx='42' cy='42' r='1.8' fill='%23fff3b0'/%3E%3Cpath d='M30 26c2-3 6-3 7 0M50 10c2 2 2 5 0 7M8 46c3 1 5 4 4 7' stroke='%23bfe3cf' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 30% auto,
+    #fff6f8;
+}
+
+/* ---------- Things on the page ---------- */
+
+.piece { aspect-ratio: auto; }
+
+.piece img {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.piece--card { aspect-ratio: 55 / 85; }
+.piece--card .card {
+  inset: 0;
+  box-shadow: 0 0.6cqi 1.6cqi rgba(40, 10, 30, 0.28);
+}
+
+.piece--badge { aspect-ratio: 1; }
+.piece--badge .badge { width: 100%; box-shadow: 0 0.8cqi 2cqi rgba(40, 10, 30, 0.3); }
+
+.piece--polaroid { aspect-ratio: var(--ratio); }
+.piece--polaroid .polaroid { width: 100%; box-shadow: 0 0.8cqi 2cqi rgba(40, 10, 30, 0.25); }
+
+/* Washi tape: see-through paper tape with torn ends */
+.piece--tape { aspect-ratio: 4 / 1; }
+
+.tape {
+  position: absolute;
+  inset: 0;
+  opacity: 0.85;
+  clip-path: polygon(2% 0, 98% 0, 100% 12%, 97% 25%, 100% 37%, 97% 50%, 100% 62%, 97% 75%, 100% 87%, 98% 100%, 2% 100%, 0 87%, 3% 75%, 0 62%, 3% 50%, 0 37%, 3% 25%, 0 12%);
+}
+
+.tape--stripes { background: repeating-linear-gradient(-45deg, #ffb3cc 0 5%, #ffe6ee 5% 10%); }
+
+.tape--dots {
+  background:
+    radial-gradient(circle, #fff 0 22%, transparent 27%) 0 0 / 12.5% 50%,
+    #9fdcc1;
+}
+
+.tape--grid {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.75) 7%, transparent 0) 0 0 / 10% 100%,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75) 9%, transparent 0) 0 0 / 100% 40%,
+    #c9b6ff;
+}
+
+.tape--gingham {
+  background:
+    linear-gradient(90deg, rgba(255, 196, 61, 0.45) 50%, transparent 0) 0 0 / 12.5% 100%,
+    linear-gradient(180deg, rgba(255, 196, 61, 0.45) 50%, transparent 0) 0 0 / 100% 50%,
+    #fff3c4;
+}
+
+.tape--hearts {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23fff' d='M10 16C4 12 3 9 4.5 6.5 6 4 9 4.5 10 7c1-2.5 4-3 5.5-.5C17 9 16 12 10 16Z'/%3E%3C/svg%3E") 0 50% / 12.5% auto repeat-x,
+    #a9d4ff;
+}
+
+/* Text: sized with the page, and with --scale (pinch / the − + buttons) */
+.piece--text { white-space: pre; }
+
+.piece__text {
+  display: block;
+  padding: 0 0.15em;
+  font-size: 1.2rem; /* fallback for older Safari */
+  font-size: calc(var(--scale, 1) * 7cqi);
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+/* ---------- The ✎ button on a journal page in the binder ---------- */
+
+.journal-page__edit {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  font: inherit;
+  font-size: 1rem;
+  color: #2b2230;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(40, 10, 30, 0.25);
+  cursor: pointer;
+}
+
+.leaf__face--back .journal-page__edit { right: auto; left: 8px; }
+
+.page--journal [data-card-id],
+.page--journal [data-merch-id] { cursor: pointer; }
+
+/* ---------- Journal editor ---------- */
+
+.journal-editor__preview {
+  position: relative;
+  width: min(60vw, 240px, (100svh - 420px) / 1.45);
+  min-width: 160px;
+  aspect-ratio: 1 / 1.45;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(40, 10, 30, 0.25);
+}
+
+.journal-editor__preview .journal-surface { border-radius: 6px; }
+
+.journal-editor__things {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 6px;
+}
+
+.journal-editor__thing {
+  flex: none;
+  width: 48px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--chip-bg);
+  cursor: pointer;
+}
+
+.journal-editor__thing img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.journal-editor__thing--badge { width: 56px; height: 56px; border-radius: 50%; align-self: center; }
+
+.journal-editor__thing--polaroid {
+  padding: 4px 4px 12px;
+  background: #fbfaf7;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.journal-editor__tapes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.journal-editor__tape {
+  position: relative;
+  width: 72px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.journal-editor__text {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  width: 100%;
+}
+
+.journal-editor__text textarea {
+  width: 100%;
+  min-height: 3.2em;
+  padding: 8px 10px;
+  border: 1px solid var(--pocket-edge);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--chip-bg);
+  resize: vertical;
+}
+
+.journal-editor__delete {
+  margin-right: auto;
+  color: #c0392b;
+}
+
+.journal-editor fieldset > legend {
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  width: 100%;
+}
+
+.journal-editor .cover-editor__controls > fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+@media (min-width: 701px) {
+  .journal-editor__preview { width: min(280px, (100svh - 260px) / 1.45); }
+}
