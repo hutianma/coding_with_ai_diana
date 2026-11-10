@@ -157,6 +157,7 @@ export function openMakeMenu(onChoose) {
     <button class="make-menu__option" type="button" data-make="card"><span class="make-menu__icon make-menu__icon--card"></span>Photocard</button>
     <button class="make-menu__option" type="button" data-make="badge"><span class="make-menu__icon make-menu__icon--badge"></span>Badge <small>吧唧</small></button>
     <button class="make-menu__option" type="button" data-make="polaroid"><span class="make-menu__icon make-menu__icon--polaroid"></span>Polaroid <small>拍立得</small></button>
+    <button class="make-menu__option" type="button" data-make="journal"><span class="make-menu__icon make-menu__icon--journal"></span>Journal page</button>
     <button class="make-menu__cancel" type="button">Cancel</button>
   `;
   const close = () => { dialog.close(); dialog.remove(); };

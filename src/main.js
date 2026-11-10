@@ -1,7 +1,9 @@
 // App entry point: load your cards and show your binder.
 import { createSampleBinder } from './data/sampleBinder.js';
 import { mountBinder } from './binder/Binder.js';
-import { loadCollection, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign } from './storage/collection.js';
+import { loadCollection, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign, saveJournalPage, deleteJournalPage, isJournal } from './storage/collection.js';
+import { openJournalEditor } from './journal/JournalEditor.js';
+import { newJournalPage } from './journal/JournalPage.js';
 import { openCoverEditor } from './binder/CoverEditor.js';
 import { askToKeepData, savingIsAvailable } from './storage/db.js';
 import { releaseImage } from './cards/imageUrls.js';
@@ -43,10 +45,10 @@ async function start() {
   const { binder, cards } = collection;
   let view = null;
 
-  // Draw the binder. Until you've made a card, show the sample cards with a hint.
+  // Draw the binder. Until you've made a card (or a journal page), show the sample cards with a hint.
   function show(page, fadeIn = false) {
     view?.destroy();
-    const hasCards = Object.keys(cards).length > 0;
+    const hasCards = Object.keys(cards).length > 0 || binder.pages.some(isJournal);
     let notice = null;
     if (!savingIsAvailable()) {
       notice = createNotice("Saving isn't working in this browser right now (private browsing?). Cards you make won't be kept. Try reloading the page.");
@@ -59,7 +61,7 @@ async function start() {
     }
     // Until you've made a card, the sample cards are shown in your binder's own cover
     const shown = hasCards
-      ? { ...binder, cards }
+      ? { ...binder, cards, merch }
       : { ...createSampleBinder(), name: binder.name, cover: binder.cover, coverColor: binder.coverColor };
     view = mountBinder(app, shown, {
       startPage: page,
@@ -74,6 +76,36 @@ async function start() {
           show(0);
         },
       }),
+      onEditJournal: hasCards ? editJournal : null,
+    });
+  }
+
+  // ---------- Journal pages ----------
+
+  // A new journal page goes right after the page you're looking at
+  function newJournal() {
+    const insertAt = view?.lastPage ?? 0;
+    openJournalEditor({
+      page: newJournalPage(),
+      isNew: true,
+      cards,
+      merch,
+      onSave: async (page) => show(await saveJournalPage(binder, page, insertAt)),
+    });
+  }
+
+  function editJournal(index) {
+    const page = binder.pages[index];
+    if (!isJournal(page)) return;
+    openJournalEditor({
+      page,
+      cards,
+      merch,
+      onSave: async (edited) => show(await saveJournalPage(binder, edited)),
+      onDelete: async () => {
+        await deleteJournalPage(binder, page.id);
+        show(Math.min(index + 1, binder.pages.length));
+      },
     });
   }
 
@@ -104,9 +136,10 @@ async function start() {
     });
   }
 
-  // Make something new: a photocard, badge or polaroid
+  // Make something new: a photocard, badge, polaroid or journal page
   function make(kind) {
-    if (kind === 'card') pickPhotosForNewCards(onSave);
+    if (kind === 'journal') newJournal();
+    else if (kind === 'card') pickPhotosForNewCards(onSave);
     else if (kind === 'badge') openBadgeWorkshop({ onSave: onSaveMerch });
     else openPolaroidWorkshop({ onSave: onSaveMerch });
   }
@@ -119,14 +152,24 @@ async function start() {
       if (previous.caption !== item.caption) releaseImage(previous.caption);
     }
     merch[item.id] = item;
+    redrawIfOnAPage(item.id);
     openShelf(item.kind === 'badge' ? 'badges' : 'polaroids');
   }
 
   async function onDeleteMerch(item) {
+    const wasOnAPage = isOnAPage(item.id);
     await deleteMerch(binder, item.id);
     releaseImage(item.image);
     releaseImage(item.caption);
     delete merch[item.id];
+    if (wasOnAPage) show(view?.page ?? 0);
+  }
+
+  const isOnAPage = (merchId) => binder.pages.some((page) => isJournal(page) && page.items.some((i) => i.merchId === merchId));
+
+  // A journal page shows this badge / polaroid: draw the binder again so it's up to date
+  function redrawIfOnAPage(merchId) {
+    if (isOnAPage(merchId)) show(view?.page ?? 0);
   }
 
   // Save a new or edited card, then show the page it's on

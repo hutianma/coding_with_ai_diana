@@ -4,6 +4,8 @@ import { createPaging, pageLabel, clamp } from './paging.js';
 import { emptySlots } from './layout.js';
 import { openCardViewer } from '../cards/CardViewer.js';
 import { decorateCover } from './CoverDesign.js';
+import { createJournalPage } from '../journal/JournalPage.js';
+import { openMerchViewer } from '../merch/viewMerch.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
@@ -13,7 +15,9 @@ const phoneQuery = matchMedia('(max-width: 700px)');
 // toolbarEnd / notice: optional elements shown at the right of the toolbar / under it.
 // fadeIn: fade the binder in (off when redrawing after a change).
 // onEditCover: shows a "✎ Edit cover" button while the binder is closed.
-export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true, onEditCover = null } = {}) {
+// onEditJournal(pageIndex): shows a ✎ button on journal pages.
+// binder.cards / binder.merch: { id: thing }, for what the pages show.
+export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true, onEditCover = null, onEditJournal = null } = {}) {
   // A binder always has at least one (empty) page, so it can be opened
   const pages = binder.pages.length ? binder.pages : [emptyPage(binder.layout)];
 
@@ -93,7 +97,12 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
     const face = paging.faceFor(leaf, side);
     if (face.type === 'cover') return createCoverFace();
     if (face.type === 'inside') return createInsideCover();
-    if (face.type === 'page') return createPage(pages[face.number - 1], face.number, binder);
+    if (face.type === 'page') {
+      const page = pages[face.number - 1];
+      return page.kind === 'journal'
+        ? createJournalPage(page, face.number, { cards: binder.cards, merch: binder.merch }, { editable: Boolean(onEditJournal) })
+        : createPage(page, face.number, binder);
+    }
     return createBlankPage();
   }
 
@@ -132,21 +141,34 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
     updateNav();
   }
 
-  // Pick up a card from its pocket
-  function pickUp(cardEl) {
-    const card = binder.cards?.[cardEl.dataset.cardId];
-    if (card) openCardViewer(card, cardEl);
+  // Pick up a card from its pocket (or a card, badge or polaroid from a journal page)
+  const PICKABLE = '.card[data-card-id], [data-merch-id]';
+  function pickUp(el) {
+    if (el.dataset.cardId) {
+      const card = binder.cards?.[el.dataset.cardId];
+      if (card) openCardViewer(card, el);
+    } else {
+      const item = binder.merch?.[el.dataset.merchId];
+      if (item) openMerchViewer(item, el);
+    }
   }
   stage.addEventListener('click', (event) => {
-    const cardEl = event.target.closest?.('.card[data-card-id]');
-    if (cardEl) pickUp(cardEl);
+    const edit = event.target.closest?.('.journal-page__edit');
+    if (edit) {
+      // Not while a page is turning
+      if (!flip.isDragging && !flip.running) onEditJournal?.(Number(edit.dataset.page) - 1);
+      return;
+    }
+    const el = event.target.closest?.(PICKABLE);
+    if (el) pickUp(el);
   });
   stage.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
-    const cardEl = event.target.closest?.('.card[data-card-id]');
-    if (cardEl) {
+    if (event.target.closest?.('button')) return; // buttons handle their own keys
+    const el = event.target.closest?.(PICKABLE);
+    if (el) {
       event.preventDefault();
-      pickUp(cardEl);
+      pickUp(el);
     }
   });
 
@@ -188,8 +210,10 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   buildBook();
 
   return {
-    // The page being looked at (0 = cover)
+    // The page being looked at (0 = cover); on a computer, the left one of the two
     get page() { return focusPage; },
+    // The last page being looked at (the right one of two on a computer; 0 = cover)
+    get lastPage() { return paging.pagesShown(flip.current).at(-1) ?? 0; },
     destroy() {
       noticeObserver?.disconnect();
       document.removeEventListener('keydown', onKey);

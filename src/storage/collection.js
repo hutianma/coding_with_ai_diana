@@ -67,7 +67,7 @@ export function placeInNextPocket(binder, cardId) {
 // Returns the page number the card is on.
 export async function saveCard(binder, card) {
   const next = { ...binder, pages: copyPages(binder) };
-  let pageNumber = next.pages.findIndex((page) => page.slots.includes(card.id)) + 1;
+  let pageNumber = next.pages.findIndex((page) => page.slots?.includes(card.id)) + 1;
   if (!pageNumber) pageNumber = placeInNextPocket(next, card.id);
   await writeMany([
     { store: 'cards', value: card },
