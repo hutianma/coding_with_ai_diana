@@ -131,6 +131,17 @@ function check(name, got, want) {
     results.push((emptyLabel === 'Page 1 of 1' ? 'PASS' : 'FAIL') + ' empty binder opens to an empty page (' + emptyLabel + ')');
     empty.destroy(); box.remove();
 
+    // While a page turns, the book is marked so expensive effects can be switched off
+    await load(390, 844, 'open'); await wait(100);
+    win = f.contentWindow; doc = win.document;
+    let frames = [];
+    win.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+    win.cancelAnimationFrame = () => {};
+    doc.querySelector('[data-dir=next]').click();
+    const turning = doc.querySelector('.book').classList.contains('is-turning');
+    let t = 0; while (frames.length) { const cb = frames.shift(); t += 700; cb(t); }
+    results.push((turning && !doc.querySelector('.book').classList.contains('is-turning') ? 'PASS' : 'FAIL') + ' the book is marked "turning" only while a page turns');
+
     // Paging maths with an odd number of pages
     const { createPaging, pageLabel } = await import('/src/binder/paging.js');
     const p3 = createPaging(false, 3);

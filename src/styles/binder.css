@@ -266,6 +266,7 @@
 
 /* Darkening (front) and shine (back) while a leaf turns */
 .leaf__shade {
+  will-change: opacity; /* its own layer: fading it doesn't redraw the page under it */
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -286,6 +287,7 @@
 
 /* Shadows cast on the pages underneath a turning leaf */
 .book__shadow {
+  will-change: opacity;
   position: absolute;
   top: 0;
   bottom: 0;
@@ -410,3 +412,18 @@
     animation: none;
   }
 }
+
+/* ---------- While a page is turning: switch off effects phones struggle with ---------- */
+.book.is-turning .cover-design--frosted {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: color-mix(in srgb, var(--cover-color) 55%, #fff);
+}
+
+.book.is-turning .card--holo::after,
+.book.is-turning .cover-design::before {
+  mix-blend-mode: normal;
+  opacity: 0.15;
+}
+
+.book.is-turning .sticker img { filter: none; }
