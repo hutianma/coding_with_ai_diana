@@ -3,6 +3,9 @@
 //   { id, kind: 'builtin', name } or { id, kind: 'image', image: Blob },
 //   plus x, y (its centre, as fractions 0–1 of the surface), scale and rotation (degrees)
 import { imageUrl } from '../cards/imageUrls.js';
+import { loadImage, unloadImage, canvasToBlob } from '../workshop/imageTools.js';
+
+const STICKER_IMAGE_MAX = 400; // your own sticker images are kept at most 400 px
 
 // Every built-in sticker has a white die-cut outline, like a real vinyl sticker
 const OUTLINE = 'stroke="#fff" stroke-width="7" stroke-linejoin="round" paint-order="stroke"';
@@ -41,6 +44,7 @@ export function createSticker(sticker) {
   const el = document.createElement('div');
   el.className = 'sticker';
   el.dataset.stickerId = sticker.id;
+  el.dataset.name = sticker.kind === 'image' ? 'Your sticker' : `${BUILTIN_STICKERS[sticker.name]?.name ?? 'Heart'} sticker`;
   const img = document.createElement('img');
   img.alt = '';
   img.draggable = false;
@@ -50,9 +54,27 @@ export function createSticker(sticker) {
   return el;
 }
 
+// Things other than stickers set their own width at scale 1 in el.dataset.width (a
+// fraction of the surface), or 'auto' (text: sized by --scale instead)
 export function placeSticker(el, sticker) {
   el.style.left = `${sticker.x * 100}%`;
   el.style.top = `${sticker.y * 100}%`;
-  el.style.width = `${STICKER_BASE_WIDTH * sticker.scale * 100}%`;
+  if (el.dataset.width === 'auto') el.style.setProperty('--scale', sticker.scale);
+  else el.style.width = `${(Number(el.dataset.width) || STICKER_BASE_WIDTH) * sticker.scale * 100}%`;
   el.style.transform = `translate(-50%, -50%) rotate(${sticker.rotation}deg)`;
+}
+
+// Your own sticker image: at most 400 px, kept as PNG so transparent parts stay transparent
+export async function shrinkSticker(file) {
+  const img = await loadImage(file);
+  try {
+    const scale = Math.min(1, STICKER_IMAGE_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await canvasToBlob(canvas, 'image/png');
+  } finally {
+    unloadImage(img);
+  }
 }

@@ -5,10 +5,9 @@ import { createStickerLayer } from '../decor/StickerLayer.js';
 import { BUILTIN_STICKERS, builtinUrl } from '../decor/stickers.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
 import { pickPhotos } from '../workshop/pickPhotos.js';
-import { loadImage, unloadImage, canvasToBlob } from '../workshop/imageTools.js';
+import { shrinkSticker } from '../decor/stickers.js';
 
 const NAME_MAX = 40;
-const STICKER_IMAGE_MAX = 400; // your own sticker images are kept at most 400 px
 
 // onSave({ name, cover }) must save it (and may throw if saving fails)
 export function openCoverEditor({ binder, cards = {}, onSave }) {
@@ -322,21 +321,6 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
   drawCardChoices();
   dialog.showModal();
   return dialog;
-}
-
-// Your own sticker image: at most 400 px, kept as PNG so transparent parts stay transparent
-async function shrinkSticker(file) {
-  const img = await loadImage(file);
-  try {
-    const scale = Math.min(1, STICKER_IMAGE_MAX / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    return await canvasToBlob(canvas, 'image/png');
-  } finally {
-    unloadImage(img);
-  }
 }
 
 // <input type="color"> only takes #rrggbb

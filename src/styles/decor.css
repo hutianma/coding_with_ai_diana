@@ -207,7 +207,7 @@
   aspect-ratio: 1;
 }
 
-.sticker img {
+.sticker > img {
   display: block;
   width: 100%;
   height: 100%;

@@ -1,5 +1,6 @@
 // Placing stickers on a surface: drag to move, pinch (or the buttons) to resize and
-// turn, ✕ to remove. Used by the cover editor (and later the journal page).
+// turn, ✕ to remove. Used by the cover editor and the journal page editor, where the
+// "stickers" can also be cards, badges, polaroids, washi tape and text.
 import { createSticker, placeSticker } from './stickers.js';
 import { makeId } from '../storage/ids.js';
 
@@ -8,7 +9,10 @@ export const MAX_SCALE = 3;
 
 // surface: the element the stickers sit on (position: relative).
 // stickers: the array of placed stickers; it is changed in place.
-export function createStickerLayer(surface, stickers) {
+// render(sticker): draws one (default: a sticker image); it may return null to skip one.
+// onSelect(sticker | null): called when the selection changes.
+// placeNew: 'edges' (around the edges, for covers) or 'scatter' (anywhere, for pages).
+export function createStickerLayer(surface, stickers, { render = createSticker, onSelect = null, placeNew = 'edges' } = {}) {
   const layer = document.createElement('div');
   layer.className = 'sticker-layer';
   layer.tabIndex = -1; // somewhere for keyboard focus to go after removing a sticker
@@ -28,16 +32,19 @@ export function createStickerLayer(surface, stickers) {
 
   let selectedId = null;
 
+  function makeEl(sticker) {
+    const el = render(sticker);
+    if (!el) return null;
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `${el.dataset.name ?? 'Sticker'}: drag to move`);
+    el.classList.toggle('is-selected', sticker.id === selectedId);
+    return el;
+  }
+
   // Redraw every sticker; keep keyboard focus on the selected one if it had focus
   function draw({ focus = false } = {}) {
-    layer.replaceChildren(...stickers.map((sticker) => {
-      const el = createSticker(sticker);
-      el.tabIndex = 0;
-      el.setAttribute('role', 'button');
-      el.setAttribute('aria-label', 'Sticker: drag to move');
-      el.classList.toggle('is-selected', sticker.id === selectedId);
-      return el;
-    }));
+    layer.replaceChildren(...stickers.map(makeEl).filter(Boolean));
     tools.hidden = !selectedId;
     if (focus) (layer.querySelector(`[data-sticker-id="${selectedId}"]`) ?? layer).focus();
   }
@@ -45,9 +52,11 @@ export function createStickerLayer(surface, stickers) {
   const byId = (id) => stickers.find((s) => s.id === id);
 
   function select(id) {
+    const changed = id !== selectedId;
     selectedId = id;
     for (const el of layer.children) el.classList.toggle('is-selected', el.dataset.stickerId === id);
     tools.hidden = !id;
+    if (changed) onSelect?.(byId(id) ?? null);
   }
 
   function update(sticker) {
@@ -130,7 +139,7 @@ export function createStickerLayer(surface, stickers) {
     if (tool === 'front' || tool === 'delete') {
       stickers.splice(stickers.indexOf(sticker), 1);
       if (tool === 'front') stickers.push(sticker);
-      else selectedId = null;
+      else select(null);
       draw({ focus: true });
       return;
     }
@@ -156,7 +165,7 @@ export function createStickerLayer(surface, stickers) {
     } else if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       stickers.splice(stickers.indexOf(sticker), 1);
-      selectedId = null;
+      select(null);
       draw({ focus: true });
     }
   });
@@ -166,23 +175,35 @@ export function createStickerLayer(surface, stickers) {
   return {
     tools, // put this element wherever the editor wants its sticker buttons
 
-    // Add a sticker somewhere around the edges (not on top of the middle), a little
-    // tilted, and select it so it can be moved straight away
+    get selected() { return byId(selectedId) ?? null; },
+
+    // Add a sticker, a little tilted, and select it so it can be moved straight away.
+    // kind 'image' / 'builtin' take the image / sticker name; other kinds take their fields.
+    // Covers: somewhere around the edges (not on top of the middle). Pages: anywhere.
     add(kind, value) {
       const angle = Math.random() * Math.PI * 2;
+      const where = placeNew === 'scatter'
+        ? { x: 0.3 + Math.random() * 0.4, y: 0.25 + Math.random() * 0.5 }
+        : { x: 0.5 + Math.cos(angle) * (0.25 + Math.random() * 0.1), y: 0.55 + Math.sin(angle) * (0.3 + Math.random() * 0.08) };
       const sticker = {
         id: makeId('sticker'),
         kind,
-        ...(kind === 'image' ? { image: value } : { name: value }),
-        x: 0.5 + Math.cos(angle) * (0.25 + Math.random() * 0.1),
-        y: 0.55 + Math.sin(angle) * (0.3 + Math.random() * 0.08),
+        ...(kind === 'image' ? { image: value } : kind === 'builtin' ? { name: value } : value),
+        ...where,
         scale: 1,
         rotation: Math.round((Math.random() - 0.5) * 24),
       };
       stickers.push(sticker);
-      selectedId = sticker.id;
       draw();
+      select(sticker.id);
       return sticker;
+    },
+
+    // Draw one sticker again after its look changed (e.g. a text was edited)
+    redraw(sticker) {
+      const old = layer.querySelector(`[data-sticker-id="${sticker.id}"]`);
+      const el = makeEl(sticker);
+      if (old && el) old.replaceWith(el);
     },
   };
 }
