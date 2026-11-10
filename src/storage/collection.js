@@ -69,6 +69,13 @@ export async function saveCard(binder, card) {
   return pageNumber;
 }
 
+// Save a new name and cover design for the binder
+export async function saveBinderDesign(binder, { name, cover }) {
+  const next = { ...binder, name, cover, coverColor: cover.color };
+  await writeMany([{ store: 'binders', value: next }]);
+  Object.assign(binder, { name, cover, coverColor: cover.color }); // only once it's safely saved
+}
+
 // ---------- Badges and polaroids ----------
 
 export async function loadMerch() {

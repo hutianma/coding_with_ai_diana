@@ -47,12 +47,19 @@
   border-radius: 4px 18px 18px 4px;
   cursor: inherit; /* the book's grab cursor */
   font: inherit;
-  color: #4a2a3a;
-  background: var(--cover-color); /* fallback for older Safari without color-mix */
-  background:
-    radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.55), transparent 55%),
-    linear-gradient(150deg, var(--cover-color), color-mix(in srgb, var(--cover-color) 70%, #8a3d63));
-  box-shadow: inset 6px 0 10px -6px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  /* The design itself (material, color, title, window, stickers) is in decor.css */
+}
+
+/* Shading along the spine edge (on top of any material) */
+.cover-face::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0 auto 0 0;
+  width: 8%;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent);
+  pointer-events: none;
 }
 
 .cover-face:focus-visible {
@@ -60,32 +67,9 @@
   outline-offset: -6px;
 }
 
-.cover-face__label {
-  position: absolute;
-  top: 18%;
-  left: 12%;
-  right: 12%;
-  display: grid;
-  gap: 6px;
-  padding: 18px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  text-align: center;
-}
-
-.cover-face__title {
-  font-size: clamp(1.1rem, 4.5vw, 1.6rem);
-  font-weight: 700;
-}
-
-.cover-face__count {
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
 .cover-face__hint {
   position: absolute;
+  z-index: 3;
   bottom: 9%;
   left: 0;
   right: 0;
@@ -135,10 +119,14 @@
   cursor: pointer;
 }
 
-.toolbar__back[hidden] {
-  display: block;
-  visibility: hidden; /* keep its space so the title stays centered */
+.toolbar__start {
+  justify-self: start;
+  display: flex;
 }
+
+/* Inside the start slot only one of "‹ Cover" / "✎ Edit cover" shows at a time */
+.toolbar__start > [hidden] { display: none; }
+
 
 .toolbar__title {
   font-weight: 600;

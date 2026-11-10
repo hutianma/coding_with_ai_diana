@@ -107,25 +107,34 @@ A milestone is finished only when **all** of these are true:
 5. ✅ **Check:** make one of each from your own photos.
 6. Acrylic stands moved to "Later" (Diana: optional).
 
-### M7: Decorate
-1. DIY binder cover: material, color, photo window, stickers.
-2. DIY card backs: upload your own image for the back (cropped like the front), or decorate it with stickers and text.
-3. Sticker layer: drag on, resize, rotate, delete.
-4. A journal page **or** an ita bag display (Diana picks which first).
-5. Saved as editable settings, not flat images.
-6. ✅ **Check:** decorate a page, reload, and edit it again.
+### M7: DIY binder cover
+1. Sticker system: built-in stickers drawn for the app + your own images; drag, pinch / buttons to resize and turn, ✕ to remove.
+2. Cover designs: pastel, leather, glitter or clear material; any color; five fonts already on phones; a window showing one of your cards (rounded, heart, circle, arch).
+3. Cover editor with a live preview, opened by ✎ Edit while the binder is closed. Saved as settings, editable again.
+4. ✅ **Check:** design a cover, reload, and edit it again.
 
-### M8: Share
-1. Export the current binder spread / journal page / ita bag as a PNG.
-2. Export a short page-flip video (WebM/MP4 via `MediaRecorder`) or GIF.
-3. Share sheet on phones (`navigator.share`), download on computers.
-4. ✅ **Check:** post one export to social media straight from the phone.
+### M8: Journal page
+1. A paper page (a few paper styles) you can add cards, badges, polaroids, stickers and text to.
+2. Move, resize and turn everything (reusing the sticker layer).
+3. Saved as settings, editable again.
+4. ✅ **Check:** make a page you'd be proud to show.
 
-### M9: Unboxing mini-game (optional)
-1. Seal chosen cards in an envelope or album.
-2. Peel the shrink-wrap, open the flap or lid, flip through, reveal the cards one by one.
-3. Sound effects + vibration where supported; Reduce Motion gets simple fades.
-4. ✅ **Check:** opening feels like a ritual, not a button.
+### M9: Card sleeves
+1. Sleeve styles: toploader, deco sleeve, glitter / holo sleeve, with charms and stickers.
+2. Show one favourite card in its sleeve (and pick it up in the viewer).
+3. ✅ **Check:** a card looks special on its own.
+
+### M10: Binder library
+1. More than one binder (create, rename, delete; cards belong to a binder).
+2. A shelf of binders you swipe through, then pull one out to open it.
+3. ✅ **Check:** switching binders feels fun.
+
+### M11: Ita bag
+1. A bag with a clear window; arrange badges and cards inside.
+2. ✅ **Check:** a bag you'd carry to a concert.
+
+### Later
+DIY card backs · share / export · unboxing mini-game · how all your things are shown in the app (e.g. a "my room" home screen) — to be designed with Diana.
 
 ### After Phase 1
 Check the signals in the README ("How we'll know Phase 1 works"). Then pick the next steps from the README's "Later" table and split them into milestones (M10, M11, …). **Each one is its own branch.**
