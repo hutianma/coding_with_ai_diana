@@ -1,0 +1,282 @@
+/* ---------- Card sleeves (卡套): toploader, bunny fabric, plush animals, puffy leather ----------
+   Drawn in layers: the card, the front panel (a material masked to the sleeve's outline,
+   with the window cut out), details (stitching, faces), shine, stickers and a charm.
+   Shapes are in CardSleeve.js. */
+
+.card-sleeve {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--ratio);
+  container-type: inline-size;
+  --sleeve-dark: color-mix(in srgb, var(--sleeve-color) 72%, #3a1f2c);
+  --sleeve-light: color-mix(in srgb, var(--sleeve-color) 55%, #fff);
+  --sleeve-inner: color-mix(in srgb, var(--sleeve-color) 45%, #ffb3cc);
+  filter: drop-shadow(0 1.2cqi 2cqi rgba(40, 10, 30, 0.28));
+}
+
+.card-sleeve > div:not(.card-sleeve__charm),
+.card-sleeve__art {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+.card-sleeve__art {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* The card inside (placed by CardSleeve.js) */
+.card-sleeve__card > .card,
+.card-sleeve__card > .card-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 5.5% / 3.5%;
+  box-shadow: none;
+}
+
+.card-sleeve__card--empty {
+  border-radius: 5.5% / 3.5%;
+  background:
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.05) 0 4cqi, transparent 4cqi 8cqi),
+    #f1ecef;
+}
+
+/* Clear plastic over the window */
+.card-sleeve .card-sleeve__window {
+  border-radius: 9%/6%;
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.35), transparent 28%, transparent 62%, rgba(255, 255, 255, 0.18) 72%, transparent 80%);
+  box-shadow: inset 0 0 0 0.5cqi rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+/* A light that slides with the tilt in the viewer (--mx / --my); still elsewhere */
+.card-sleeve__shine {
+  pointer-events: none;
+  background: radial-gradient(circle at var(--mx, 30%) var(--my, 18%), rgba(255, 255, 255, 0.45), transparent 55%);
+  mix-blend-mode: soft-light;
+}
+
+.card-sleeve__stickers { z-index: 1; pointer-events: none; }
+.card-sleeve .sticker-layer { z-index: 1; }
+
+/* ---------- Toploader: thick clear plastic ---------- */
+
+.card-sleeve__plastic-back {
+  background: color-mix(in srgb, var(--sleeve-color) 25%, rgba(255, 255, 255, 0.45));
+}
+
+.card-sleeve__plastic {
+  background:
+    linear-gradient(118deg, transparent 18%, rgba(255, 255, 255, 0.55) 27%, rgba(255, 255, 255, 0.08) 34%, transparent 40%),
+    linear-gradient(118deg, transparent 58%, rgba(255, 255, 255, 0.25) 64%, transparent 70%),
+    color-mix(in srgb, var(--sleeve-color) 12%, rgba(255, 255, 255, 0.06));
+}
+
+.card-sleeve__edge {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1.2;
+}
+
+.card-sleeve__edge--inner {
+  stroke: color-mix(in srgb, var(--sleeve-color) 40%, rgba(120, 110, 130, 0.45));
+  stroke-width: 0.5;
+}
+
+.card-sleeve--toploader .card-sleeve__art { filter: drop-shadow(0 0 0.3px rgba(80, 60, 90, 0.5)); }
+
+/* ---------- Bunny fabric: woven cotton with stitching ---------- */
+
+.card-sleeve--fabric .card-sleeve__body {
+  background:
+    radial-gradient(ellipse 90% 60% at 35% 25%, rgba(255, 255, 255, 0.35), transparent 70%),
+    radial-gradient(ellipse 120% 80% at 50% 110%, rgba(0, 0, 0, 0.16), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 2px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 2px),
+    var(--noise-grain) 0 0 / 120px 120px,
+    var(--sleeve-color);
+  background-blend-mode: normal, normal, normal, normal, soft-light, normal;
+}
+
+.card-sleeve__stitch {
+  fill: none;
+  stroke: var(--sleeve-dark);
+  stroke-width: 0.55;
+  stroke-dasharray: 1.6 1.1;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.card-sleeve__inner-ear { fill: var(--sleeve-inner); opacity: 0.85; }
+.card-sleeve__bow { fill: var(--sleeve-dark); }
+
+/* ---------- Plush animals: short faux fur with a fuzzy edge ---------- */
+
+.card-sleeve--plush .card-sleeve__body {
+  background:
+    radial-gradient(ellipse 80% 45% at 40% 18%, rgba(255, 255, 255, 0.3), transparent 70%),
+    radial-gradient(ellipse 110% 90% at 50% 55%, transparent 60%, rgba(0, 0, 0, 0.18)),
+    var(--fur, none) 0 0 / var(--fur-size, 64px) var(--fur-size, 64px),
+    var(--sleeve-color);
+}
+
+.card-sleeve--plush .card-sleeve__window { border-radius: 12%/7.6%; }
+
+.card-sleeve__eye { fill: #3a2a30; }
+.card-sleeve__eye-light { fill: #fff; }
+.card-sleeve__nose { fill: #3a2a30; }
+.card-sleeve__nose--pink { fill: #f08aa8; }
+.card-sleeve__mouth { fill: none; stroke: #3a2a30; stroke-width: 0.55; stroke-linecap: round; }
+.card-sleeve__blush { fill: #ff9ab8; opacity: 0.55; }
+.card-sleeve__muzzle { fill: color-mix(in srgb, var(--sleeve-color) 35%, #fff6ee); opacity: 0.9; }
+.card-sleeve__muzzle--fox { fill: #fffaf4; }
+.card-sleeve__inner-ear--fox { fill: #fffaf4; opacity: 0.95; }
+.card-sleeve__ear-line { fill: none; stroke: var(--sleeve-dark); stroke-width: 0.6; stroke-linecap: round; opacity: 0.35; }
+.card-sleeve__scarf { fill: #ef7f9c; }
+.card-sleeve__scarf-stripe { stroke: #fff; stroke-width: 1.4; opacity: 0.85; }
+.card-sleeve__carrot { fill: #f59a3c; }
+
+/* ---------- Puffy leather: glossy faux leather, padded and puffed up ---------- */
+
+.card-sleeve--puffy .card-sleeve__body {
+  border-radius: 18.9% / 13.5%;
+  background:
+    radial-gradient(ellipse 70% 30% at 30% 8%, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.1) 55%, transparent 75%),
+    linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.3) 38%, transparent 46%),
+    var(--sleeve-pattern, none),
+    var(--noise-grain) 0 0 / 90px 90px,
+    linear-gradient(170deg, color-mix(in srgb, var(--sleeve-color) 85%, #fff), var(--sleeve-color) 45%, color-mix(in srgb, var(--sleeve-color) 80%, #000));
+  background-blend-mode: normal, normal, normal, soft-light, normal;
+  box-shadow:
+    inset 0 2.5cqi 3cqi -0.5cqi rgba(255, 255, 255, 0.6),
+    inset 0 -3cqi 4cqi -0.5cqi rgba(0, 0, 0, 0.3),
+    inset 2cqi 0 3cqi -1cqi rgba(255, 255, 255, 0.25),
+    inset -2cqi 0 3cqi -1cqi rgba(0, 0, 0, 0.15);
+}
+
+.card-sleeve--pattern-dots { --sleeve-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='%23fff' fill-opacity='.9'%3E%3Ccircle cx='5' cy='5' r='2.6'/%3E%3Ccircle cx='15' cy='15' r='2.6'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 16cqi 16cqi; }
+/* Each pattern is one background layer (the blend modes above count on that) */
+.card-sleeve--pattern-hearts { --sleeve-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath fill='%23fff' fill-opacity='.9' d='M10 17C4 13 3 9.5 4.6 7 6.2 4.6 9 5 10 7.4 11 5 13.8 4.6 15.4 7 17 9.5 16 13 10 17Z'/%3E%3Cpath fill='%23fff' fill-opacity='.9' d='M30 37C24 33 23 29.5 24.6 27 26.2 24.6 29 25 30 27.4 31 25 33.8 24.6 35.4 27 37 29.5 36 33 30 37Z'/%3E%3C/svg%3E") 0 0 / 22cqi 22cqi; }
+.card-sleeve--pattern-cakes { --sleeve-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cg transform='translate(4 6)'%3E%3Cpath fill='%23fff' d='M2 12h18v10H2z'/%3E%3Cpath fill='%23ff8fb6' d='M2 12c0-5 4-7 9-7s9 2 9 7c-2 2-3 0-4.5 1.5S13 15 11 13s-3 1-5 0-2 1-4-1z'/%3E%3Cpath fill='%23ffc2d6' d='M2 17h18v2H2z'/%3E%3Ccircle cx='11' cy='3.5' r='2.4' fill='%23e8344f'/%3E%3C/g%3E%3Cg transform='translate(32 34)'%3E%3Cpath fill='%23fff' d='M2 12h18v10H2z'/%3E%3Cpath fill='%23b9e4ff' d='M2 12c0-5 4-7 9-7s9 2 9 7c-2 2-3 0-4.5 1.5S13 15 11 13s-3 1-5 0-2 1-4-1z'/%3E%3Cpath fill='%23ffe08a' d='M2 17h18v2H2z'/%3E%3Ccircle cx='11' cy='3.5' r='2.4' fill='%23e8344f'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 30cqi 30cqi; }
+
+.card-sleeve--puffy .card-sleeve__window { border-radius: 16% / 10%; }
+
+.card-sleeve__rim-shadow {
+  fill: none;
+  stroke: rgba(40, 10, 30, 0.28);
+  stroke-width: 2.2;
+  filter: blur(0.9px);
+}
+
+.card-sleeve__rim-light {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1.3;
+  filter: blur(0.7px);
+}
+
+.card-sleeve--puffy .card-sleeve__stitch { opacity: 0.55; }
+
+/* Dark colors: lighter stitching so it still shows */
+.card-sleeve--dark { --sleeve-dark: color-mix(in srgb, var(--sleeve-color) 40%, #fff); }
+
+/* ---------- Charm: hangs from its ring, and can swing (--swing, set in the viewer) ---------- */
+
+.card-sleeve__charm {
+  position: absolute;
+  z-index: 2;
+  aspect-ratio: 40 / 76;
+  transform: translate(-50%, -6.6%) rotate(var(--swing, 0deg));
+  transform-origin: 50% 6.6%;
+  pointer-events: none;
+}
+
+.card-sleeve--back .card-sleeve__charm { transform: translate(-50%, -6.6%) rotate(calc(var(--swing, 0deg) * -1)); }
+
+.card-sleeve__charm-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0.6cqi 0.8cqi rgba(40, 10, 30, 0.3));
+}
+
+/* ---------- On the shelf, in the viewer and on journal pages ---------- */
+
+.my-cards__thumb--sleeve {
+  aspect-ratio: auto;
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: 6px 14px 6px 4px;
+  overflow: visible;
+  box-shadow: none;
+  background: transparent;
+}
+
+.my-cards__thumb--sleeve .card-sleeve { width: 92%; }
+
+.viewer--shape-sleeve .viewer__lift {
+  width: min(64vw, 290px, (100svh - 200px) * var(--ratio, 0.6));
+  aspect-ratio: var(--ratio, 0.6);
+}
+
+.viewer--shape-sleeve .viewer__face {
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.viewer--shape-sleeve .viewer__glare,
+.viewer--shape-sleeve .viewer__holo { display: none; }
+
+.viewer__face > .card-sleeve { position: absolute; inset: 0; }
+.viewer--shape-sleeve .viewer__card:focus-visible { border-radius: 8px; }
+
+.piece--sleeve { aspect-ratio: var(--ratio); }
+
+.make-menu__icon--sleeve {
+  width: 26px;
+  margin: 0 4px;
+  border-radius: 4px;
+  background:
+    linear-gradient(150deg, #f7a8d0, #8c7af0) 4px 5px / 18px 25px no-repeat,
+    rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), inset 0 0 0 1.5px #e7e0ea;
+}
+
+/* ---------- Sleeve editor ---------- */
+
+.sleeve-editor__preview {
+  position: relative;
+  width: min(44vw, 190px, (100svh - 430px) * var(--ratio, 0.6));
+  min-width: 120px;
+  aspect-ratio: var(--ratio, 0.6);
+  margin: 6px 16px 0 0; /* room for the charm */
+  container-type: inline-size;
+}
+
+.sleeve-editor__preview > .card-sleeve { position: absolute; inset: 0; }
+
+.sleeve-editor__cards [aria-checked="true"] {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sleeve-editor .cover-editor__controls > fieldset:not(.patterns, .swatches) {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sleeve-editor fieldset[hidden] { display: none; }
+
+@media (min-width: 701px) {
+  .sleeve-editor__preview { width: min(240px, (100svh - 280px) * var(--ratio, 0.6)); }
+}
