@@ -84,7 +84,7 @@ Each milestone (M#) is one branch, built and reviewed as described in [WORKFLOW.
 | **M6: More merch** | Badges with 流麻 fills, polaroids with 合拍 layouts, the My stuff shelf (+ a prettier holo foil) | Make one of each from your photos | ✅ Done |
 | **M7: DIY binder cover** | Material, color, name and font, a card window, stickers (built-in or your own images) | Design a cover, reload, and edit it again | ✅ Done |
 | **M8: Journal page** | A paper page in the binder to arrange cards, badges, polaroids, stickers, washi tape and text freely | A page you'd be proud to show | ✅ Done |
-| **M9: Card sleeves** | Pretty sleeves to show off a favourite card (toploaders, deco sleeves, charms, glitter) | A card looks special on its own | ⬜ |
+| **M9: Card sleeves** | Pretty sleeves to show off a favourite card (toploaders, bunny fabric, plush animals, puffy leather, charms) | A card looks special on its own | ✅ Done |
 | **M10: Binder library** | Many binders (e.g. one per group or member) on a shelf you swipe through and pull a binder from | Switching binders feels fun | ⬜ |
 | **M11: Ita bag** | Arrange badges and cards behind a bag's clear window | A bag you'd carry to a concert | ⬜ |
 | **Later** | DIY card backs (own image, stickers) · share/export images and videos · unboxing mini-game · how to show all your things in the app (e.g. a "my room" home screen) | — | ⬜ |

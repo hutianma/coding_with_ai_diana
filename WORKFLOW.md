@@ -120,8 +120,8 @@ A milestone is finished only when **all** of these are true:
 4. ✅ **Check:** make a page you'd be proud to show.
 
 ### M9: Card sleeves
-1. Sleeve styles: toploader, deco sleeve, glitter / holo sleeve, with charms and stickers.
-2. Show one favourite card in its sleeve (and pick it up in the viewer).
+1. Sleeve styles: toploader, bunny-ear fabric, plush animals (bear, fox, puppy, snowman), puffy leather (dots, cakes, hearts); any color; charms and stickers. (Diana: no holo sleeves.)
+2. Show one favourite card in its sleeve: on the shelf, on journal pages, and picked up in the viewer (the charm swings with the tilt).
 3. ✅ **Check:** a card looks special on its own.
 
 ### M10: Binder library
