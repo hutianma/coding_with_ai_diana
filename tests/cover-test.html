@@ -11,6 +11,8 @@
 <script type="module">
 import { coverOf, defaultCover } from '/src/binder/CoverDesign.js';
 import { builtinUrl, BUILTIN_STICKERS } from '/src/decor/stickers.js';
+import { furTexture } from '/src/binder/furTexture.js';
+import { decorateCover } from '/src/binder/CoverDesign.js';
 
 const out = document.getElementById('out');
 const results = [];
@@ -46,6 +48,10 @@ try {
   // ---------- Pure helpers ----------
   check('older binders (only a color) still get a full cover design', coverOf({ coverColor: '#123456' }).color === '#123456' && coverOf({}).material === 'pastel');
   check('covers saved with old material names still work', coverOf({ cover: { material: 'leather' } }).material === 'pu' && coverOf({ cover: { material: 'clear' } }).material === 'frosted');
+  const fur = furTexture('#f7c6d9');
+  check('furry covers get a strand-by-strand fur texture (made once per color)', fur.startsWith('url("data:image/png') && furTexture('#f7c6d9') === fur && furTexture('#c9b6ff') !== fur);
+  const furryEl = decorateCover(document.createElement('div'), { name: 'x', cover: { material: 'furry', color: '#f7c6d9', stickers: [] } });
+  check('…and the cover uses it', furryEl.classList.contains('cover-design--furry') && furryEl.style.getPropertyValue('--fur') === fur);
   check('every built-in sticker makes an image', Object.keys(BUILTIN_STICKERS).every((k) => builtinUrl(k).startsWith('data:image/svg+xml')));
 
   // ---------- Make a card so the window has something to show ----------
