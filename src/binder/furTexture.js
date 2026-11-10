@@ -3,7 +3,7 @@
 // that repeats seamlessly. Made once per color and then reused.
 
 const TILE = 256; // px (shown at half size, so it stays sharp on phone screens)
-const HAIRS = 5600; // short hairs, so more of them to keep the fur thick
+const HAIRS = 7000; // short hairs, so more of them to keep the fur thick
 const cache = new Map();
 
 export function furTexture(color) {
@@ -20,20 +20,20 @@ export function furTexture(color) {
 
   // Back to front: dark undercoat first, then mid tones, then light tips on top
   const layers = [
-    { count: HAIRS * 0.3, light: [-0.15, -0.04], alpha: [0.45, 0.75], width: [1.6, 2.4] },
+    { count: HAIRS * 0.25, light: [-0.12, -0.03], alpha: [0.45, 0.75], width: [1.6, 2.4] },
     { count: HAIRS * 0.4, light: [0, 0.16], alpha: [0.45, 0.75], width: [1.3, 2] },
-    { count: HAIRS * 0.3, light: [0.22, 0.5], alpha: [0.4, 0.75], width: [1, 1.6] },
+    { count: HAIRS * 0.35, light: [0.25, 0.55], alpha: [0.45, 0.8], width: [1.1, 1.7] },
   ];
   for (const layer of layers) {
     for (let i = 0; i < layer.count; i++) {
       const x = random() * TILE;
       const y = random() * TILE;
-      // Hairs lie loosely downwards with a gentle wave across the tile: short and a bit
-      // tousled, so it looks soft and plush rather than long and brushed
+      // Very short hairs pointing every which way (only loosely downwards), so it looks
+      // fluffy and plush rather than long and brushed
       const flow = Math.sin((x / TILE) * Math.PI * 2) * 0.35 + Math.cos((y / TILE) * Math.PI * 2) * 0.2;
-      const angle = Math.PI / 2 - 0.35 + flow + (random() - 0.5) * 1.2;
-      const length = 4 + random() * 5;
-      const bend = (random() - 0.5) * 4;
+      const angle = Math.PI / 2 - 0.35 + flow + (random() - 0.5) * 1.7;
+      const length = 2.5 + random() * 3.5;
+      const bend = (random() - 0.5) * 2;
       const light = layer.light[0] + random() * (layer.light[1] - layer.light[0]);
       ctx.strokeStyle = shade(base, light);
       ctx.globalAlpha = layer.alpha[0] + random() * (layer.alpha[1] - layer.alpha[0]);
