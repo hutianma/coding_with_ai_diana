@@ -1,24 +1,29 @@
-// "My stuff": everything you've made — photocards, badges and polaroids — on one shelf.
+// "My stuff": everything you've made — photocards, badges, polaroids and card sleeves — on
+// one shelf.
 // Tap something to pick it up; Edit and Delete under each.
 import { imageUrl } from '../cards/imageUrls.js';
 import { cardName } from '../cards/Card.js';
 import { openCardViewer } from '../cards/CardViewer.js';
 import { createBadge, badgeName } from '../merch/Badge.js';
 import { createPolaroid, polaroidName } from '../merch/Polaroid.js';
+import { createCardSleeve, sleeveName } from '../merch/CardSleeve.js';
 import { openMerchViewer } from '../merch/viewMerch.js';
 
 const TABS = [
   { value: 'cards', name: 'Photocards', empty: 'No photocards yet.' },
   { value: 'badges', name: 'Badges', empty: 'No badges yet.' },
   { value: 'polaroids', name: 'Polaroids', empty: 'No polaroids yet.' },
+  { value: 'sleeves', name: 'Sleeves', empty: 'No card sleeves yet.' },
 ];
+const TAB_KINDS = { badges: 'badge', polaroids: 'polaroid', sleeves: 'sleeve' };
 
 let lastTab = 'cards';
 
 // cards / merch: { id: item } (kept up to date by the caller).
 // onEdit(kind, item), onDelete(kind, item): kind is 'card' or 'merch'.
 // onMake(tab): make something new from an empty tab.
-export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, tab = lastTab }) {
+// deleteNote(kind, item): optional extra words for the "Delete?" question.
+export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, deleteNote = null, tab = lastTab }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'my-cards';
   dialog.setAttribute('aria-labelledby', 'my-cards-title');
@@ -38,8 +43,7 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, tab =
   function itemsFor(name) {
     const byDate = (a, b) => a.createdAt - b.createdAt;
     if (name === 'cards') return Object.values(cards).sort(byDate);
-    const kind = name === 'badges' ? 'badge' : 'polaroid';
-    return Object.values(merch).filter((m) => m.kind === kind).sort(byDate);
+    return Object.values(merch).filter((m) => m.kind === TAB_KINDS[name]).sort(byDate);
   }
 
   function draw() {
@@ -71,7 +75,9 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, tab =
 
   function createItem(item, i) {
     const isCard = current === 'cards';
-    const name = isCard ? (item.back?.text || `Card ${i + 1}`) : item.kind === 'badge' ? `${badgeName(item)} ${i + 1}` : `${polaroidName(item)} ${i + 1}`;
+    const name = isCard ? (item.back?.text || `Card ${i + 1}`)
+      : item.kind === 'badge' ? `${badgeName(item)} ${i + 1}`
+        : item.kind === 'sleeve' ? `${sleeveName(item)} ${i + 1}` : `${polaroidName(item)} ${i + 1}`;
     const li = document.createElement('li');
     li.className = 'my-cards__item';
     li.innerHTML = `
@@ -90,12 +96,13 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, tab =
       thumb.append(img);
     } else {
       thumb.classList.add(`my-cards__thumb--${item.kind}`);
-      const art = item.kind === 'badge' ? createBadge(item) : createPolaroid(item);
+      const art = item.kind === 'badge' ? createBadge(item)
+        : item.kind === 'sleeve' ? createCardSleeve(item, cards[item.cardId]) : createPolaroid(item);
       art.removeAttribute('role');
       art.removeAttribute('aria-label');
       thumb.append(art);
     }
-    thumb.addEventListener('click', () => (isCard ? openCardViewer(item, thumb) : openMerchViewer(item, thumb)));
+    thumb.addEventListener('click', () => (isCard ? openCardViewer(item, thumb) : openMerchViewer(item, thumb, { cards })));
     li.querySelector('[data-action="edit"]').setAttribute('aria-label', `Edit ${name}`);
     li.querySelector('[data-action="delete"]').setAttribute('aria-label', `Delete ${name}`);
     li.querySelector('[data-action="edit"]').addEventListener('click', () => {
@@ -103,7 +110,8 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, tab =
       onEdit(isCard ? 'card' : 'merch', item);
     });
     li.querySelector('[data-action="delete"]').addEventListener('click', async () => {
-      if (!confirm(`Delete "${name}"? This can't be undone.`)) return;
+      const note = deleteNote?.(isCard ? 'card' : 'merch', item);
+      if (!confirm(`Delete "${name}"? ${note ? `${note} ` : ''}This can't be undone.`)) return;
       try {
         await onDelete(isCard ? 'card' : 'merch', item);
       } catch (err) {
@@ -157,6 +165,7 @@ export function openMakeMenu(onChoose) {
     <button class="make-menu__option" type="button" data-make="card"><span class="make-menu__icon make-menu__icon--card"></span>Photocard</button>
     <button class="make-menu__option" type="button" data-make="badge"><span class="make-menu__icon make-menu__icon--badge"></span>Badge <small>吧唧</small></button>
     <button class="make-menu__option" type="button" data-make="polaroid"><span class="make-menu__icon make-menu__icon--polaroid"></span>Polaroid <small>拍立得</small></button>
+    <button class="make-menu__option" type="button" data-make="sleeve"><span class="make-menu__icon make-menu__icon--sleeve"></span>Card sleeve</button>
     <button class="make-menu__option" type="button" data-make="journal"><span class="make-menu__icon make-menu__icon--journal"></span>Journal page</button>
     <button class="make-menu__cancel" type="button">Cancel</button>
   `;

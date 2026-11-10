@@ -10,6 +10,7 @@ import { releaseImage } from './cards/imageUrls.js';
 import { pickPhotosForNewCards, editCard } from './workshop/Workshop.js';
 import { openMyCards, openMakeMenu } from './workshop/MyCards.js';
 import { openBadgeWorkshop, openPolaroidWorkshop } from './merch/MerchWorkshop.js';
+import { openSleeveWorkshop } from './merch/SleeveWorkshop.js';
 
 const app = document.getElementById('app');
 
@@ -132,22 +133,33 @@ async function start() {
       onEdit: (kind, item) => {
         if (kind === 'card') editCard(item, onSave);
         else if (item.kind === 'badge') openBadgeWorkshop({ existing: item, onSave: onSaveMerch });
+        else if (item.kind === 'sleeve') openSleeveWorkshop({ existing: item, cards, onSave: onSaveMerch });
         else openPolaroidWorkshop({ existing: item, onSave: onSaveMerch });
       },
       onDelete: (kind, item) => (kind === 'card' ? onDelete(item) : onDeleteMerch(item)),
-      onMake: (shelfTab) => make({ cards: 'card', badges: 'badge', polaroids: 'polaroid' }[shelfTab]),
+      deleteNote: (kind, item) => {
+        const count = kind === 'card' ? sleevesWith(item.id).length : 0;
+        if (!count) return '';
+        return count === 1 ? 'It\'s in a card sleeve, which will be deleted too.' : `It's in ${count} card sleeves, which will be deleted too.`;
+      },
+      onMake: (shelfTab) => make({ cards: 'card', badges: 'badge', polaroids: 'polaroid', sleeves: 'sleeve' }[shelfTab]),
     });
   }
 
-  // Make something new: a photocard, badge, polaroid or journal page
+  // Make something new: a photocard, badge, polaroid, card sleeve or journal page
   function make(kind) {
     if (kind === 'journal') newJournal();
     else if (kind === 'card') pickPhotosForNewCards(onSave);
     else if (kind === 'badge') openBadgeWorkshop({ onSave: onSaveMerch });
+    else if (kind === 'sleeve') openSleeveWorkshop({ cards, onSave: onSaveMerch });
     else openPolaroidWorkshop({ onSave: onSaveMerch });
   }
 
-  // Badges and polaroids live on the shelf; after saving, show it there
+  const SHELF_TABS = { badge: 'badges', polaroid: 'polaroids', sleeve: 'sleeves' };
+  const stickerImages = (item) => (item.stickers ?? []).filter((s) => s.kind === 'image').map((s) => s.image);
+  const sleevesWith = (cardId) => Object.values(merch).filter((m) => m.kind === 'sleeve' && m.cardId === cardId);
+
+  // Badges, polaroids and sleeves live on the shelf; after saving, show it there
   async function onSaveMerch(item, previous) {
     await saveMerch(item);
     if (previous) {
@@ -156,7 +168,7 @@ async function start() {
     }
     merch[item.id] = item;
     redrawIfOnAPage(item.id);
-    openShelf(item.kind === 'badge' ? 'badges' : 'polaroids');
+    openShelf(SHELF_TABS[item.kind]);
   }
 
   async function onDeleteMerch(item) {
@@ -164,6 +176,7 @@ async function start() {
     await deleteMerch(binder, item.id);
     releaseImage(item.image);
     releaseImage(item.caption);
+    stickerImages(item).forEach(releaseImage);
     delete merch[item.id];
     if (wasOnAPage) show(view?.page ?? 0);
   }
@@ -186,8 +199,14 @@ async function start() {
     show(page);
   }
 
+  // Deleting a card also deletes the sleeves it's in (My stuff says so first)
   async function onDelete(card) {
-    await deleteCard(binder, card.id);
+    const sleeves = sleevesWith(card.id);
+    await deleteCard(binder, card.id, sleeves.map((m) => m.id));
+    for (const sleeve of sleeves) {
+      stickerImages(sleeve).forEach(releaseImage);
+      delete merch[sleeve.id];
+    }
     // The cover's window showed this card: empty the window
     if (binder.cover?.window?.cardId === card.id) {
       await saveBinderDesign(binder, { name: binder.name, cover: { ...binder.cover, window: null } });

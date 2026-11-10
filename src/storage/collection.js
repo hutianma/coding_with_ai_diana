@@ -84,7 +84,7 @@ export async function saveBinderDesign(binder, { name, cover }) {
   Object.assign(binder, { name, cover, coverColor: cover.color }); // only once it's safely saved
 }
 
-// ---------- Badges and polaroids ----------
+// ---------- Badges, polaroids and card sleeves ----------
 
 export async function loadMerch() {
   const list = await getAll('merch');
@@ -95,7 +95,7 @@ export function saveMerch(item) {
   return writeMany([{ store: 'merch', value: item }]);
 }
 
-// Delete a badge or polaroid, and take it off any journal page it was on
+// Delete a badge, polaroid or sleeve, and take it off any journal page it was on
 export async function deleteMerch(binder, id) {
   const onAPage = journalUses(binder, (item) => item.merchId === id);
   const pages = onAPage ? withoutItems(binder, (item) => item.merchId === id) : binder.pages;
@@ -106,15 +106,19 @@ export async function deleteMerch(binder, id) {
   binder.pages = pages; // only once it's safely saved
 }
 
-// Delete a card: empty its pocket and take it off any journal page it was on
-export async function deleteCard(binder, cardId) {
-  const pages = withoutItems(binder, (item) => item.cardId === cardId).map((page) => (isJournal(page) ? page : {
+// Delete a card: empty its pocket and take it off any journal page it was on. The card
+// sleeves it's in (sleeveIds) go too, as there'd be nothing in them.
+export async function deleteCard(binder, cardId, sleeveIds = []) {
+  const sleeves = new Set(sleeveIds);
+  const gone = (item) => item.cardId === cardId || sleeves.has(item.merchId);
+  const pages = withoutItems(binder, gone).map((page) => (isJournal(page) ? page : {
     ...page,
     slots: page.slots.map((id) => (id === cardId ? null : id)),
   }));
   await writeMany([
     { store: 'binders', value: { ...binder, pages } },
     { store: 'cards', deleteId: cardId },
+    ...sleeveIds.map((id) => ({ store: 'merch', deleteId: id })),
   ]);
   binder.pages = pages; // only once it's safely saved
 }
