@@ -262,7 +262,7 @@
   width: 100%;
 }
 
-.journal-editor .cover-editor__controls > fieldset {
+.journal-editor .cover-editor__controls > fieldset:not(.patterns) {
   display: grid;
   gap: 8px;
   margin: 0;
