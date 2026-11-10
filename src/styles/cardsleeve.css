@@ -280,3 +280,13 @@
 @media (min-width: 701px) {
   .sleeve-editor__preview { width: min(240px, (100svh - 280px) * var(--ratio, 0.6)); }
 }
+
+/* In the journal editor's row of your things */
+.journal-editor__thing--sleeve {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  padding: 0 6px 0 0;
+  overflow: visible;
+  background: transparent;
+}

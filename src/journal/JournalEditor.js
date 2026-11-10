@@ -6,6 +6,7 @@ import { createStickerLayer } from '../decor/StickerLayer.js';
 import { createStickerPalette } from '../decor/stickerPalette.js';
 import { FONTS } from '../binder/CoverDesign.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
+import { createCardSleeve, sleeveName } from '../merch/CardSleeve.js';
 
 // page: the journal page to edit (a new one, or one from the binder; it isn't changed).
 // cards / merch: { id: thing }, to choose from.
@@ -24,7 +25,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
   const keptAside = page.items.filter((item) => !canShow(item, things) && (item.kind === 'card' || item.kind === 'merch'));
   const startImages = new Set(page.items.filter((s) => s.kind === 'image').map((s) => s.image));
   const cardList = Object.values(cards).filter((c) => c.front).sort((a, b) => a.createdAt - b.createdAt);
-  const merchList = Object.values(merch).filter((m) => m.image).sort((a, b) => a.createdAt - b.createdAt);
+  const merchList = Object.values(merch).filter((m) => m.image || m.kind === 'sleeve').sort((a, b) => a.createdAt - b.createdAt);
   const textStyle = { font: FONTS[0].value, color: TEXT_COLORS[0].value };
 
   const dialog = document.createElement('dialog');
@@ -51,7 +52,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
           <div class="journal-editor__things" data-list="cards"></div>
         </fieldset>
         <fieldset>
-          <legend>Your badges &amp; polaroids</legend>
+          <legend>Your badges, polaroids &amp; sleeves</legend>
           <div class="journal-editor__things" data-list="merch"></div>
         </fieldset>
         <fieldset>
@@ -138,22 +139,30 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
   if (!cardList.length) cardsBox.append(hint('Make a photocard first to put it here.'));
 
   const merchBox = dialog.querySelector('[data-list="merch"]');
+  const MERCH_NAMES = { badge: 'Badge', polaroid: 'Polaroid' };
   merchBox.append(...merchList.map((item, i) => thingButton(
-    item.kind === 'badge' ? 'badge' : 'polaroid', imageUrl(item.image),
-    `${item.kind === 'badge' ? 'Badge' : 'Polaroid'} ${i + 1}`,
+    item.kind,
+    item.kind === 'sleeve' ? createCardSleeve(item, cards[item.cardId], { stickers: false }) : imageUrl(item.image),
+    item.kind === 'sleeve' ? sleeveName(item) : `${MERCH_NAMES[item.kind] ?? 'Polaroid'} ${i + 1}`,
     () => layer.add('merch', { merchId: item.id }),
   )));
-  if (!merchList.length) merchBox.append(hint('Make a badge or polaroid first to put it here.'));
+  if (!merchList.length) merchBox.append(hint('Make a badge, polaroid or card sleeve first to put it here.'));
 
-  function thingButton(kind, src, name, onClick) {
+  // picture: an image URL, or a drawing (a sleeve)
+  function thingButton(kind, picture, name, onClick) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `journal-editor__thing journal-editor__thing--${kind}`;
     btn.setAttribute('aria-label', `Add ${name}`);
-    const img = document.createElement('img');
-    img.alt = '';
-    img.src = src;
-    btn.append(img);
+    if (typeof picture === 'string') {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.src = picture;
+      btn.append(img);
+    } else {
+      picture.removeAttribute('role');
+      btn.append(picture);
+    }
     btn.addEventListener('click', onClick);
     return btn;
   }

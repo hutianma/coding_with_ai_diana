@@ -4,13 +4,15 @@
 // Saved as { id, kind: 'journal', paper, items }. Each item is placed like a sticker
 // (x, y as fractions of the page, scale, rotation) and is one of:
 //   { kind: 'builtin', name } / { kind: 'image', image }   a sticker
-//   { kind: 'card', cardId } / { kind: 'merch', merchId }  one of your things
+//   { kind: 'card', cardId } / { kind: 'merch', merchId }  one of your things (a merch item
+//                                                          is a badge, polaroid or card sleeve)
 //   { kind: 'tape', pattern }                              a strip of washi tape
 //   { kind: 'text', text, font, color }
 import { createSticker, placeSticker } from '../decor/stickers.js';
 import { createCard, cardName } from '../cards/Card.js';
 import { createBadge, badgeName } from '../merch/Badge.js';
 import { createPolaroid, polaroidName, polaroidRatio } from '../merch/Polaroid.js';
+import { createCardSleeve, sleeveName, sleeveRatio, sleeveWidthPerCard } from '../merch/CardSleeve.js';
 import { fontCss, FONTS } from '../binder/CoverDesign.js';
 import { makeId } from '../storage/ids.js';
 
@@ -79,7 +81,13 @@ export function createPiece(item, things = {}) {
     el.dataset.name = cardName(card);
   } else if (item.kind === 'merch') {
     const thing = things.merch[item.merchId];
-    if (thing.kind === 'badge') {
+    if (thing.kind === 'sleeve') {
+      el.classList.add('piece--sleeve');
+      el.style.setProperty('--ratio', sleeveRatio(thing));
+      el.append(createCardSleeve(thing, things.cards?.[thing.cardId]));
+      el.dataset.width = WIDTH.card * sleeveWidthPerCard(thing); // the card inside is card-sized
+      el.dataset.name = sleeveName(thing);
+    } else if (thing.kind === 'badge') {
       el.classList.add('piece--badge');
       el.append(createBadge(thing));
       el.dataset.width = WIDTH.badge;
