@@ -123,7 +123,8 @@ export function placeTitle(label, title) {
   label.style.setProperty('--title-size', title.size);
 }
 
-function isDark(hex) {
+// Is this color dark (so things on it should be light)?
+export function isDark(hex) {
   const n = parseInt(String(hex).replace('#', ''), 16);
   if (Number.isNaN(n)) return false;
   return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) < 120;

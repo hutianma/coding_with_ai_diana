@@ -4,6 +4,7 @@
 import { createJournalSurface, createPiece, canShow, paperOf, PAPERS, TAPES, TEXT_COLORS, TEXT_MAX } from './JournalPage.js';
 import { createStickerLayer } from '../decor/StickerLayer.js';
 import { createStickerPalette } from '../decor/stickerPalette.js';
+import { stickerImages } from '../decor/stickers.js';
 import { FONTS } from '../binder/CoverDesign.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
 import { createCardSleeve, sleeveName } from '../merch/CardSleeve.js';
@@ -23,7 +24,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
     items: page.items.filter((item) => canShow(item, things)).map((item) => ({ ...item })),
   };
   const keptAside = page.items.filter((item) => !canShow(item, things) && (item.kind === 'card' || item.kind === 'merch'));
-  const startImages = new Set(page.items.filter((s) => s.kind === 'image').map((s) => s.image));
+  const startImages = new Set(stickerImages(page.items));
   const cardList = Object.values(cards).filter((c) => c.front).sort((a, b) => a.createdAt - b.createdAt);
   const merchList = Object.values(merch).filter((m) => m.image || m.kind === 'sleeve').sort((a, b) => a.createdAt - b.createdAt);
   const textStyle = { font: FONTS[0].value, color: TEXT_COLORS[0].value };
@@ -143,7 +144,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
   merchBox.append(...merchList.map((item, i) => thingButton(
     item.kind,
     item.kind === 'sleeve' ? createCardSleeve(item, cards[item.cardId], { stickers: false }) : imageUrl(item.image),
-    item.kind === 'sleeve' ? sleeveName(item) : `${MERCH_NAMES[item.kind] ?? 'Polaroid'} ${i + 1}`,
+    `${item.kind === 'sleeve' ? sleeveName(item) : MERCH_NAMES[item.kind] ?? 'Polaroid'} ${i + 1}`,
     () => layer.add('merch', { merchId: item.id }),
   )));
   if (!merchList.length) merchBox.append(hint('Make a badge, polaroid or card sleeve first to put it here.'));
@@ -236,13 +237,11 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
     dialog.querySelectorAll('.workshop__footer button').forEach((b) => { b.disabled = value; });
   }
 
-  const imagesIn = (items) => items.filter((s) => s.kind === 'image').map((s) => s.image);
-
   // Let go of sticker images that are no longer used (to free memory): after Save, the
   // ones taken off the page; after Cancel, the ones added in this session
   function close(kept) {
     const keep = new Set(kept);
-    for (const image of new Set([...startImages, ...imagesIn(draft.items)])) {
+    for (const image of new Set([...startImages, ...stickerImages(draft.items)])) {
       if (!keep.has(image)) releaseImage(image);
     }
     dialog.close();
@@ -258,7 +257,7 @@ export function openJournalEditor({ page, cards = {}, merch = {}, isNew = false,
       // Emptied texts are left out.
       const items = [...keptAside, ...draft.items.filter((item) => canShow(item, things))].map((item) => ({ ...item }));
       await onSave({ id: draft.id, kind: 'journal', paper: draft.paper, items });
-      close(imagesIn(items));
+      close(stickerImages(items));
     } catch (err) {
       showError(`Couldn't save the page. ${err.message ?? ''}`.trim());
     } finally {

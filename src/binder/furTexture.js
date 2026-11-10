@@ -4,10 +4,17 @@
 
 const TILE = 256; // px (shown at half size, so it stays sharp on phone screens)
 const HAIRS = 7000; // short hairs, so more of them to keep the fur thick
-const cache = new Map();
+const cache = new Map(); // color → texture, the most recently used last
+const CACHE_MAX = 12;
 
 export function furTexture(color) {
-  if (cache.has(color)) return cache.get(color);
+  if (cache.has(color)) {
+    const url = cache.get(color);
+    cache.delete(color);
+    cache.set(color, url);
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+    return url;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = TILE;
   const ctx = canvas.getContext('2d');
@@ -57,6 +64,7 @@ export function furTexture(color) {
   ctx.globalAlpha = 1;
   const url = `url("${canvas.toDataURL('image/png')}")`;
   cache.set(color, url);
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
   return url;
 }
 

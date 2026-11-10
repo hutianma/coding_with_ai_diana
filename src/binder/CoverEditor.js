@@ -3,6 +3,7 @@
 import { decorateCover, coverOf, placeTitle, MATERIALS, COVER_COLORS, FONTS, WINDOW_SHAPES, TITLE_SIZE } from './CoverDesign.js';
 import { createStickerLayer } from '../decor/StickerLayer.js';
 import { createStickerPalette } from '../decor/stickerPalette.js';
+import { stickerImages } from '../decor/stickers.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
 
 const NAME_MAX = 40;
@@ -18,7 +19,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     name: binder.name,
     cover: { ...start, title: { ...start.title }, window: startWindow, stickers: start.stickers.map((s) => ({ ...s })) },
   };
-  const startImages = new Set(start.stickers.filter((s) => s.kind === 'image').map((s) => s.image));
+  const startImages = new Set(stickerImages(start.stickers));
 
   const dialog = document.createElement('dialog');
   dialog.className = 'workshop cover-editor';
@@ -261,9 +262,8 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
   // Let go of sticker images that are no longer used (to free memory): after Save, the
   // ones taken off the cover; after Cancel, the ones added in this session
   function close(saved = false) {
-    const kept = new Set((saved ? draft.cover.stickers : start.stickers)
-      .filter((s) => s.kind === 'image').map((s) => s.image));
-    const all = new Set([...startImages, ...draft.cover.stickers.filter((s) => s.kind === 'image').map((s) => s.image)]);
+    const kept = new Set(stickerImages(saved ? draft.cover.stickers : start.stickers));
+    const all = new Set([...startImages, ...stickerImages(draft.cover.stickers)]);
     for (const image of all) if (!kept.has(image)) releaseImage(image);
     dialog.close();
     dialog.remove();

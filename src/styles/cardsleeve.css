@@ -1,4 +1,4 @@
-/* ---------- Card sleeves (卡套): toploader, bunny fabric, plush animals, puffy leather ----------
+/* ---------- Card sleeves: toploader, bunny fabric, plush animals, puffy leather ----------
    Drawn in layers: the card, the front panel (a material masked to the sleeve's outline,
    with the window cut out), details (stitching, faces), shine, stickers and a charm.
    Shapes are in CardSleeve.js. */
@@ -262,7 +262,8 @@
 
 .sleeve-editor__preview > .card-sleeve { position: absolute; inset: 0; }
 
-.sleeve-editor__cards [aria-checked="true"] {
+.sleeve-editor__cards label:has(input:checked),
+.sleeve-editor__cards label:has(input:focus-visible) {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }

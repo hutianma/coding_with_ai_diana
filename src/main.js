@@ -7,6 +7,7 @@ import { newJournalPage } from './journal/JournalPage.js';
 import { openCoverEditor } from './binder/CoverEditor.js';
 import { askToKeepData, savingIsAvailable } from './storage/db.js';
 import { releaseImage } from './cards/imageUrls.js';
+import { stickerImages } from './decor/stickers.js';
 import { pickPhotosForNewCards, editCard } from './workshop/Workshop.js';
 import { openMyCards, openMakeMenu } from './workshop/MyCards.js';
 import { openBadgeWorkshop, openPolaroidWorkshop } from './merch/MerchWorkshop.js';
@@ -35,7 +36,7 @@ async function start() {
   try {
     [collection, merch] = await Promise.all([
       loadCollection(),
-      // Badges and polaroids failing to load shouldn't hide your cards
+      // Badges, polaroids and sleeves failing to load shouldn't hide your cards
       loadMerch().catch(() => { merchProblem = true; return {}; }),
     ]);
   } catch (err) {
@@ -44,6 +45,15 @@ async function start() {
   }
   if (savingIsAvailable()) askToKeepData();
   const { binder, cards } = collection;
+  // A sleeve whose card was deleted while the sleeves couldn't be loaded: it'd be empty,
+  // so it goes too (as it would have then)
+  for (const sleeve of Object.values(merch)) {
+    if (sleeve.kind !== 'sleeve' || cards[sleeve.cardId]) continue;
+    try {
+      await deleteMerch(binder, sleeve.id);
+      delete merch[sleeve.id];
+    } catch { /* try again next time */ }
+  }
   let view = null;
   let showingSamples = false; // the sample binder is shown (you haven't made anything yet)
 
@@ -57,7 +67,7 @@ async function start() {
       notice = createNotice("Saving isn't working in this browser right now (private browsing?). Cards you make won't be kept. Try reloading the page.");
       notice.classList.add('notice--warning');
     } else if (merchProblem) {
-      notice = createNotice("Your badges and polaroids couldn't be loaded. Try reloading the page.");
+      notice = createNotice("Your badges, polaroids and card sleeves couldn't be loaded. Try reloading the page.");
       notice.classList.add('notice--warning');
     } else if (!hasCards) {
       notice = createNotice('These are sample cards. Tap “＋ New” to make your own from your photos.');
@@ -156,7 +166,6 @@ async function start() {
   }
 
   const SHELF_TABS = { badge: 'badges', polaroid: 'polaroids', sleeve: 'sleeves' };
-  const stickerImages = (item) => (item.stickers ?? []).filter((s) => s.kind === 'image').map((s) => s.image);
   const sleevesWith = (cardId) => Object.values(merch).filter((m) => m.kind === 'sleeve' && m.cardId === cardId);
 
   // Badges, polaroids and sleeves live on the shelf; after saving, show it there
@@ -176,7 +185,7 @@ async function start() {
     await deleteMerch(binder, item.id);
     releaseImage(item.image);
     releaseImage(item.caption);
-    stickerImages(item).forEach(releaseImage);
+    stickerImages(item.stickers ?? []).forEach(releaseImage);
     delete merch[item.id];
     if (wasOnAPage) show(view?.page ?? 0);
   }
@@ -204,7 +213,7 @@ async function start() {
     const sleeves = sleevesWith(card.id);
     await deleteCard(binder, card.id, sleeves.map((m) => m.id));
     for (const sleeve of sleeves) {
-      stickerImages(sleeve).forEach(releaseImage);
+      stickerImages(sleeve.stickers).forEach(releaseImage);
       delete merch[sleeve.id];
     }
     // The cover's window showed this card: empty the window

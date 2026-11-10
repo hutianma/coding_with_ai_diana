@@ -59,6 +59,6 @@ function openSleeveViewer(item, from, card) {
     from,
     onGravity: swing ? (x, y) => swing.setGravity(x, y) : null,
     onShake: swing ? (dx) => swing.push(dx) : null,
-    onClose: () => swing?.stop(),
+    onClose: () => { if (swing) swing.stop(); },
   });
 }

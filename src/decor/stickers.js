@@ -25,6 +25,11 @@ export const BUILTIN_STICKERS = {
   biasTag: { name: 'Bias tag', svg: `<rect ${OUTLINE} x="8" y="30" width="84" height="40" rx="20" fill="#6ec3ff"/><text x="50" y="58" text-anchor="middle" font-family="ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif" font-size="22" font-weight="800" fill="#fff">♡ BIAS</text>` },
 };
 
+// The images (Blobs) of your own stickers among these placed things
+export function stickerImages(stickers) {
+  return stickers.filter((s) => s.kind === 'image').map((s) => s.image);
+}
+
 const svgUrls = new Map();
 
 // A built-in sticker as an image URL (made once)

@@ -1,4 +1,4 @@
-// Draws a card sleeve (卡套) with one of your photocards inside: a clear toploader, a fabric
+// Draws a card sleeve with one of your photocards inside: a clear toploader, a fabric
 // sleeve with bunny ears, a plush animal, or a puffy leather sleeve. It can have a little
 // charm hanging from it and stickers on the front.
 //
@@ -11,6 +11,7 @@ import { createCard } from '../cards/Card.js';
 import { createCardBack, DEFAULT_BACK } from '../cards/CardBack.js';
 import { createSticker } from '../decor/stickers.js';
 import { furTexture, FUR_TILE_CSS } from '../binder/furTexture.js';
+import { isDark } from '../binder/CoverDesign.js';
 
 export const CARD_MM = [55, 85];
 
@@ -346,10 +347,4 @@ function charmSvg(name) {
     <g fill="#e6e1e8" stroke="#b9b2bf" stroke-width=".5">${beads}</g>
     ${CHARM_ART[name] ?? CHARM_ART.heart}
   </svg>`;
-}
-
-function isDark(hex) {
-  const n = parseInt(String(hex).replace('#', ''), 16);
-  if (Number.isNaN(n)) return false;
-  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) < 120;
 }

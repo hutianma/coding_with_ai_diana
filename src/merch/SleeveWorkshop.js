@@ -3,6 +3,7 @@
 import { createCardSleeve, newSleeve, sleeveOf, sleeveRatio, startColor, STYLES, ANIMALS, PATTERNS, SLEEVE_COLORS, CHARMS } from './CardSleeve.js';
 import { createStickerLayer } from '../decor/StickerLayer.js';
 import { createStickerPalette } from '../decor/stickerPalette.js';
+import { stickerImages } from '../decor/stickers.js';
 import { imageUrl, releaseImage } from '../cards/imageUrls.js';
 import { cardName } from '../cards/Card.js';
 import { makeId } from '../storage/ids.js';
@@ -19,7 +20,7 @@ export function openSleeveWorkshop({ existing = null, cards = {}, cardId = null,
   // Work on a copy; nothing changes until Save
   const start = sleeveOf(existing ?? newSleeve(cardId ?? cardList[0]?.id ?? null));
   const draft = { ...start, stickers: start.stickers.map((s) => ({ ...s })) };
-  const startImages = new Set(start.stickers.filter((s) => s.kind === 'image').map((s) => s.image));
+  const startImages = new Set(stickerImages(start.stickers));
 
   const dialog = document.createElement('dialog');
   dialog.className = 'workshop cover-editor sleeve-editor';
@@ -37,7 +38,7 @@ export function openSleeveWorkshop({ existing = null, cards = {}, cardId = null,
       <div class="cover-editor__controls">
         <fieldset>
           <legend>Photocard</legend>
-          <div class="journal-editor__things sleeve-editor__cards" role="radiogroup" aria-label="Photocard in the sleeve"></div>
+          <div class="journal-editor__things sleeve-editor__cards"></div>
         </fieldset>
         <fieldset class="patterns">
           <legend>Sleeve</legend>
@@ -118,6 +119,11 @@ export function openSleeveWorkshop({ existing = null, cards = {}, cardId = null,
   let colorChosen = draft.color !== startColor(draft.style, draft.animal);
   dialog.addEventListener('change', (event) => {
     const { name, value } = event.target;
+    if (name === 'card') {
+      draft.cardId = value;
+      draw();
+      return;
+    }
     if (!['style', 'animal', 'pattern', 'charm', 'color'].includes(name)) return;
     draft[name] = value;
     if (name === 'color') colorChosen = true;
@@ -125,11 +131,16 @@ export function openSleeveWorkshop({ existing = null, cards = {}, cardId = null,
     checkColor();
     draw();
   });
+  // Dragging through the color picker sends many colors: draw at most once a frame
+  let colorFrame = 0;
   $('input[name="custom-color"]').addEventListener('input', (event) => {
     draft.color = event.target.value;
     colorChosen = true;
-    checkColor();
-    draw();
+    dialog.querySelectorAll('input[name="color"]').forEach((i) => { i.checked = false; });
+    colorFrame ||= requestAnimationFrame(() => {
+      colorFrame = 0;
+      draw();
+    });
   });
 
   // ---------- Your photocards ----------
@@ -141,29 +152,16 @@ export function openSleeveWorkshop({ existing = null, cards = {}, cardId = null,
     cardsBox.append(p);
   }
   for (const [i, card] of cardList.entries()) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'journal-editor__thing journal-editor__thing--card';
-    btn.setAttribute('role', 'radio');
-    btn.dataset.cardId = card.id;
-    btn.setAttribute('aria-label', card.back?.text ? cardName(card) : `Card ${i + 1}`);
-    const img = document.createElement('img');
-    img.alt = '';
-    img.src = imageUrl(card.front);
-    btn.append(img);
-    cardsBox.append(btn);
+    const label = document.createElement('label');
+    label.className = 'journal-editor__thing journal-editor__thing--card';
+    label.innerHTML = '<input type="radio" name="card" class="visually-hidden"><img alt="">';
+    const input = label.querySelector('input');
+    input.value = card.id;
+    input.checked = card.id === draft.cardId;
+    input.setAttribute('aria-label', card.back?.text ? cardName(card) : `Card ${i + 1}`);
+    label.querySelector('img').src = imageUrl(card.front);
+    cardsBox.append(label);
   }
-  const markCard = () => cardsBox.querySelectorAll('[data-card-id]').forEach((b) => {
-    b.setAttribute('aria-checked', String(b.dataset.cardId === draft.cardId));
-  });
-  markCard();
-  cardsBox.addEventListener('click', (event) => {
-    const btn = event.target.closest('[data-card-id]');
-    if (!btn) return;
-    draft.cardId = btn.dataset.cardId;
-    markCard();
-    draw();
-  });
 
   // ---------- Stickers ----------
   $('.sleeve-editor__palette').replaceWith(createStickerPalette(layer, { setBusy, showError, isOpen: () => dialog.isConnected }));
@@ -180,13 +178,11 @@ export function openSleeveWorkshop({ existing = null, cards = {}, cardId = null,
     saveBtn.disabled = value || !cards[draft.cardId];
   }
 
-  const imagesIn = (stickers) => stickers.filter((s) => s.kind === 'image').map((s) => s.image);
-
   // Let go of sticker images that are no longer used (to free memory): after Save, the
   // ones taken off; after Cancel, the ones added in this session
   function close(kept) {
     const keep = new Set(kept);
-    for (const image of new Set([...startImages, ...imagesIn(draft.stickers)])) {
+    for (const image of new Set([...startImages, ...stickerImages(draft.stickers)])) {
       if (!keep.has(image)) releaseImage(image);
     }
     dialog.close();
@@ -206,7 +202,7 @@ export function openSleeveWorkshop({ existing = null, cards = {}, cardId = null,
         stickers: draft.stickers.map((s) => ({ ...s })),
       };
       await onSave(sleeve, existing);
-      close(imagesIn(sleeve.stickers));
+      close(stickerImages(sleeve.stickers));
     } catch (err) {
       showError(`Couldn't save the sleeve. ${err.message ?? ''}`.trim());
     } finally {

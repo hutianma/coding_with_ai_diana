@@ -16,7 +16,8 @@ export function createCharmSwing(charms) {
 
   function step(now) {
     frame = 0;
-    const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
+    // (A frame's time can be a little before the moment it was asked for)
+    const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
     last = now;
     speed += (-STIFFNESS * (angle - rest) - DAMPING * speed) * dt;
     angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, angle + speed * dt));

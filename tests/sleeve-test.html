@@ -117,7 +117,7 @@ try {
   await until(() => editor());
   check('a new sleeve starts as a toploader with your first card', doc.querySelector('#sleeve-editor-title').textContent === 'New card sleeve'
     && previewSleeve().classList.contains('card-sleeve--toploader') && !!previewSleeve().querySelector('.card')
-    && doc.querySelector('.sleeve-editor__cards [aria-checked="true"]') === doc.querySelector('.sleeve-editor__cards [data-card-id]'));
+    && doc.querySelector('.sleeve-editor__cards input:checked') === doc.querySelector('.sleeve-editor__cards input'));
   check('animal and pattern choices are hidden for a toploader', editor().querySelector('[data-for="plush"]').hidden && editor().querySelector('[data-for="puffy"]').hidden);
 
   pick('style', 'plush');
@@ -131,10 +131,10 @@ try {
   pick('color', '#f7c6d9');
   check('then any color can be chosen', previewSleeve().style.getPropertyValue('--sleeve-color') === '#f7c6d9');
   pick('charm', 'moon');
-  editor().querySelectorAll('.sleeve-editor__cards [data-card-id]')[1].click();
+  editor().querySelectorAll('.sleeve-editor__cards input')[1].click();
   editor().querySelector('[data-sticker="heart"]').click();
   check('charm, card and a sticker can be chosen', !!previewSleeve().querySelector('.card-sleeve__charm')
-    && editor().querySelectorAll('.sleeve-editor__cards [aria-checked="true"]').length === 1
+    && editor().querySelectorAll('.sleeve-editor__cards input')[1].checked
     && editor().querySelectorAll('.sleeve-editor__preview .sticker-layer .sticker').length === 1);
   pick('style', 'puffy');
   check('Puffy leather shows the patterns, and the sticker stays', !editor().querySelector('[data-for="puffy"]').hidden && editor().querySelector('[data-for="plush"]').hidden
