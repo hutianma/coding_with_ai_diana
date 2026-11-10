@@ -3,6 +3,7 @@
 // be edited again.
 import { imageUrl } from '../cards/imageUrls.js';
 import { createSticker } from '../decor/stickers.js';
+import { furTexture, FUR_TILE_CSS } from './furTexture.js';
 
 export const MATERIALS = [
   { value: 'pastel', name: 'Pastel' },
@@ -71,6 +72,10 @@ export function decorateCover(el, binder, cards = {}, { count = null } = {}) {
   const cover = coverOf(binder);
   el.classList.add('cover-design', `cover-design--${cover.material}`);
   el.style.setProperty('--cover-color', cover.color);
+  if (cover.material === 'furry') {
+    el.style.setProperty('--fur', furTexture(cover.color));
+    el.style.setProperty('--fur-size', `${FUR_TILE_CSS}px`);
+  }
   el.classList.toggle('cover-design--dark', isDark(cover.color));
 
   const windowCard = cover.window ? cards[cover.window.cardId] : null;
