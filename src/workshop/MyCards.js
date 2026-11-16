@@ -23,7 +23,9 @@ let lastTab = 'cards';
 // onEdit(kind, item), onDelete(kind, item): kind is 'card' or 'merch'.
 // onMake(tab): make something new from an empty tab.
 // deleteNote(kind, item): optional extra words for the "Delete?" question.
-export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, deleteNote = null, tab = lastTab }) {
+// binders / binderOf(card) / onMove(card, binder): with more than one binder, cards get a
+// Move button to put them in another binder.
+export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, deleteNote = null, binders = [], binderOf = null, onMove = null, tab = lastTab }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'my-cards';
   dialog.setAttribute('aria-labelledby', 'my-cards-title');
@@ -84,6 +86,7 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, delet
       <button class="my-cards__thumb" type="button"></button>
       <div class="my-cards__buttons">
         <button type="button" data-action="edit">Edit</button>
+        <button type="button" data-action="move" hidden>Move</button>
         <button type="button" data-action="delete">Delete</button>
       </div>
     `;
@@ -105,6 +108,12 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, delet
     thumb.addEventListener('click', () => (isCard ? openCardViewer(item, thumb) : openMerchViewer(item, thumb, { cards })));
     li.querySelector('[data-action="edit"]').setAttribute('aria-label', `Edit ${name}`);
     li.querySelector('[data-action="delete"]').setAttribute('aria-label', `Delete ${name}`);
+    const move = li.querySelector('[data-action="move"]');
+    if (isCard && onMove && binders.length > 1) {
+      move.hidden = false;
+      move.setAttribute('aria-label', `Move ${name} to another binder`);
+      move.addEventListener('click', () => chooseBinder(item));
+    }
     li.querySelector('[data-action="edit"]').addEventListener('click', () => {
       close();
       onEdit(isCard ? 'card' : 'merch', item);
@@ -121,6 +130,22 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, delet
       draw();
     });
     return li;
+  }
+
+  // Which binder should this card go in? (Its own binder is shown, but can't be chosen.)
+  function chooseBinder(card) {
+    const now = binderOf?.(card);
+    openChoiceMenu({
+      title: 'Move to which binder?',
+      options: binders.map((b) => ({ value: b.id, label: b.name, note: b === now ? 'it\'s here now' : '', disabled: b === now })),
+      onChoose: async (id) => {
+        try {
+          await onMove(card, binders.find((b) => b.id === id));
+        } catch (err) {
+          alert(`Couldn't move this card. ${err.message ?? ''}`.trim());
+        }
+      },
+    });
   }
 
   dialog.querySelector('.my-cards__tabs').addEventListener('click', (event) => {
@@ -157,18 +182,47 @@ export function openMyCards({ cards, merch = {}, onEdit, onDelete, onMake, delet
 
 // "＋ New": choose what to make
 export function openMakeMenu(onChoose) {
+  const icon = (kind) => `<span class="make-menu__icon make-menu__icon--${kind}"></span>`;
+  openChoiceMenu({
+    title: 'Make something new',
+    options: [
+      { value: 'card', html: `${icon('card')}Photocard` },
+      { value: 'badge', html: `${icon('badge')}Badge <small>吧唧</small>` },
+      { value: 'polaroid', html: `${icon('polaroid')}Polaroid <small>拍立得</small>` },
+      { value: 'sleeve', html: `${icon('sleeve')}Card sleeve` },
+      { value: 'journal', html: `${icon('journal')}Journal page` },
+    ],
+    onChoose,
+  });
+}
+
+// A small menu of choices. options: [{ value, html } or { value, label, note?, disabled? }]
+// (html is trusted markup; label and note are shown as plain text).
+export function openChoiceMenu({ title, options, onChoose }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'make-menu';
-  dialog.setAttribute('aria-label', 'Make something new');
-  dialog.innerHTML = `
-    <p class="make-menu__title">Make something new</p>
-    <button class="make-menu__option" type="button" data-make="card"><span class="make-menu__icon make-menu__icon--card"></span>Photocard</button>
-    <button class="make-menu__option" type="button" data-make="badge"><span class="make-menu__icon make-menu__icon--badge"></span>Badge <small>吧唧</small></button>
-    <button class="make-menu__option" type="button" data-make="polaroid"><span class="make-menu__icon make-menu__icon--polaroid"></span>Polaroid <small>拍立得</small></button>
-    <button class="make-menu__option" type="button" data-make="sleeve"><span class="make-menu__icon make-menu__icon--sleeve"></span>Card sleeve</button>
-    <button class="make-menu__option" type="button" data-make="journal"><span class="make-menu__icon make-menu__icon--journal"></span>Journal page</button>
-    <button class="make-menu__cancel" type="button">Cancel</button>
-  `;
+  dialog.setAttribute('aria-label', title);
+  dialog.innerHTML = '<p class="make-menu__title"></p>';
+  dialog.querySelector('.make-menu__title').textContent = title;
+  for (const option of options) {
+    const btn = document.createElement('button');
+    btn.className = 'make-menu__option';
+    btn.type = 'button';
+    btn.dataset.make = option.value;
+    btn.disabled = Boolean(option.disabled);
+    if (option.html) {
+      btn.innerHTML = option.html;
+    } else {
+      btn.textContent = option.label;
+      if (option.note) {
+        const small = document.createElement('small');
+        small.textContent = option.note;
+        btn.append(' ', small);
+      }
+    }
+    dialog.append(btn);
+  }
+  dialog.insertAdjacentHTML('beforeend', '<button class="make-menu__cancel" type="button">Cancel</button>');
   const close = () => { dialog.close(); dialog.remove(); };
   dialog.addEventListener('click', (event) => {
     const option = event.target.closest('[data-make]');

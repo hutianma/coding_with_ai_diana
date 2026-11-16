@@ -562,6 +562,7 @@ button.my-cards__thumb {
 }
 
 .make-menu__option small { color: var(--muted); font-weight: 400; }
+.make-menu__option:disabled { opacity: 0.5; cursor: default; }
 
 .make-menu__icon {
   flex: none;
