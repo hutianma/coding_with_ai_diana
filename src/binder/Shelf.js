@@ -1,5 +1,5 @@
-// The bookshelf: all your binders standing on a shelf, covers facing out. Swipe (or use
-// the arrows / ← → keys) to look along it; the one in the middle comes forward. Tap it to
+// The bookshelf: all your binders standing on a shelf, covers facing out. Swipe or drag
+// it (or use the mouse wheel, the arrows or the ← → keys) to look along it; the one in the middle comes forward. Tap it to
 // pull it out and open it. At the end there's a space for a new binder.
 import { decorateCover } from './CoverDesign.js';
 import { countCards, plural } from './layout.js';
@@ -104,6 +104,59 @@ export function mountShelf(root, { binders, cards, current = null, onOpen, onNew
     track.addEventListener(type, () => { glideTo = null; }, { passive: true });
   }
 
+  // ---------- Sliding with a mouse ----------
+  // Fingers and trackpads slide the shelf already. A mouse can drag it too (it settles on
+  // the nearest binder when you let go), and the mouse wheel steps along it. A drag
+  // doesn't count as a tap on a binder.
+  let mouseDrag = null;
+  let justDragged = false;
+  track.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    mouseDrag = { id: event.pointerId, x: event.clientX, left: track.scrollLeft, moved: false };
+    justDragged = false;
+  });
+  track.addEventListener('pointermove', (event) => {
+    if (!mouseDrag || event.pointerId !== mouseDrag.id) return;
+    const dx = event.clientX - mouseDrag.x;
+    if (!mouseDrag.moved) {
+      if (Math.abs(dx) < 5) return; // still a click
+      mouseDrag.moved = true;
+      track.classList.add('is-dragging'); // no snapping while it follows the mouse
+      try { track.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
+    }
+    track.scrollLeft = mouseDrag.left - dx;
+  });
+  const endMouseDrag = (event) => {
+    if (!mouseDrag || event.pointerId !== mouseDrag.id) return;
+    justDragged = mouseDrag.moved;
+    mouseDrag = null;
+    if (!justDragged) return;
+    track.classList.remove('is-dragging');
+    scrollToSlot(measure()); // settle on the nearest binder
+  };
+  track.addEventListener('pointerup', endMouseDrag);
+  track.addEventListener('pointercancel', endMouseDrag);
+  track.addEventListener('click', (event) => {
+    if (!justDragged) return;
+    justDragged = false;
+    event.stopPropagation();
+    event.preventDefault();
+  }, true);
+
+  // An up/down mouse wheel steps one binder at a time (sideways scrolling works by itself)
+  let wheelSum = 0;
+  let wheelPause = 0;
+  track.addEventListener('wheel', (event) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.preventDefault();
+    if (wheelPause) return;
+    wheelSum += event.deltaY;
+    if (Math.abs(wheelSum) < 40) return;
+    scrollToSlot(centered + Math.sign(wheelSum));
+    wheelSum = 0;
+    wheelPause = setTimeout(() => { wheelPause = 0; }, 350);
+  }, { passive: false });
+
   function updateNav() {
     label.textContent = centered < binders.length ? `${centered + 1} of ${binders.length}` : 'New binder';
     prevBtn.disabled = centered === 0;
@@ -189,6 +242,7 @@ export function mountShelf(root, { binders, cards, current = null, onOpen, onNew
     destroy() {
       cancelAnimationFrame(frame);
       clearTimeout(glideTimer);
+      clearTimeout(wheelPause);
       resized.disconnect();
       view.remove();
     },

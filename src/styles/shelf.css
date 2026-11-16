@@ -19,7 +19,9 @@
   font-size: inherit;
 }
 
-.shelf-view .toolbar__title { display: block; } /* (phones hide the binder's title) */
+/* The title shows in the middle on phones too (the binder hides its title there) */
+.shelf-view .toolbar { grid-template-columns: 1fr auto 1fr; }
+.shelf-view .toolbar__title { display: block; }
 
 .shelf {
   position: relative;
@@ -32,7 +34,7 @@
   align-items: flex-end;
   gap: 0;
   margin: 0;
-  padding: 24px calc(50vw - var(--cover-w) * 0.6) 0;
+  padding: calc(var(--cover-w) * 0.2 + 16px) calc(50vw - var(--cover-w) * 0.6) 0; /* room above for a binder to lift and grow */
   list-style: none;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -41,6 +43,16 @@
 }
 
 .shelf__track::-webkit-scrollbar { display: none; }
+
+/* A mouse can drag the shelf (Shelf.js) */
+@media (hover: hover) {
+  .shelf__track { cursor: grab; }
+}
+
+.shelf__track.is-dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
 
 .shelf__slot {
   --near: 0;
@@ -66,7 +78,16 @@
   transform-origin: 50% 100%;
   transform: scale(calc(0.78 + var(--near) * 0.22));
   opacity: calc(0.55 + var(--near) * 0.45);
-  transition: transform 0.12s linear, opacity 0.12s linear;
+  transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+}
+
+/* With a mouse: the binder under it lifts up and grows a little */
+@media (hover: hover) {
+  .shelf__track:not(.is-dragging) .shelf__binder:hover,
+  .shelf__track:not(.is-dragging) .shelf__new:hover {
+    transform: translateY(-10px) scale(calc((0.78 + var(--near) * 0.22) * 1.1));
+    opacity: 1;
+  }
 }
 
 .shelf__binder {
