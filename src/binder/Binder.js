@@ -6,6 +6,7 @@ import { openCardViewer } from '../cards/CardViewer.js';
 import { decorateCover } from './CoverDesign.js';
 import { createJournalPage } from '../journal/JournalPage.js';
 import { openMerchViewer } from '../merch/viewMerch.js';
+import { countCards } from '../storage/collection.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
@@ -15,9 +16,10 @@ const phoneQuery = matchMedia('(max-width: 700px)');
 // toolbarEnd / notice: optional elements shown at the right of the toolbar / under it.
 // fadeIn: fade the binder in (off when redrawing after a change).
 // onEditCover: shows a "✎ Edit cover" button while the binder is closed.
+// onShelf: shows a "‹ Shelf" button while the binder is closed (put it back on the shelf).
 // onEditJournal(pageIndex): shows a ✎ button on journal pages.
 // binder.cards / binder.merch: { id: thing }, for what the pages show.
-export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true, onEditCover = null, onEditJournal = null } = {}) {
+export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, notice = null, fadeIn = true, onEditCover = null, onEditJournal = null, onShelf = null } = {}) {
   // A binder always has at least one (empty) page, so it can be opened
   const pages = binder.pages.length ? binder.pages : [emptyPage(binder.layout)];
 
@@ -31,6 +33,7 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   toolbar.className = 'toolbar';
   toolbar.innerHTML = `
     <span class="toolbar__start">
+      <button class="toolbar__shelf" type="button" hidden>‹ Shelf</button>
       <button class="toolbar__back" type="button">‹ Cover</button>
       <button class="toolbar__action toolbar__edit" type="button" aria-label="Edit cover" hidden>✎ Edit</button>
     </span>
@@ -40,6 +43,13 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   // textContent (not innerHTML) so names are always shown as plain text
   toolbar.querySelector('.toolbar__title').textContent = binder.name;
   const backBtn = toolbar.querySelector('.toolbar__back');
+  const shelfBtn = toolbar.querySelector('.toolbar__shelf');
+  if (onShelf) {
+    shelfBtn.addEventListener('click', () => {
+      if (flip.current !== 0 || flip.isDragging || flip.running) return;
+      onShelf();
+    });
+  }
   const editBtn = toolbar.querySelector('.toolbar__edit');
   if (onEditCover) {
     editBtn.addEventListener('click', () => {
@@ -84,6 +94,7 @@ export function mountBinder(root, binder, { startPage = 0, toolbarEnd = null, no
   function onSettle(current) {
     const closed = current === 0;
     backBtn.hidden = closed;
+    shelfBtn.hidden = !closed || !onShelf;
     editBtn.hidden = !closed || !onEditCover;
     const lost = !view.contains(document.activeElement) || document.activeElement.closest('[inert]') ||
       (document.activeElement === backBtn && closed);
@@ -236,13 +247,6 @@ function createInsideCover() {
   return el;
 }
 
-function countCards(binder) {
-  return binder.pages.reduce(
-    (sum, page) => sum + (page.slots?.filter(Boolean).length ?? 0),
-    0,
-  );
-}
-
-function plural(count, word) {
+export function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
 }

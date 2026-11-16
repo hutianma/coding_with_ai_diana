@@ -108,7 +108,8 @@
   font-size: 0.9rem;
 }
 
-.toolbar__back {
+.toolbar__back,
+.toolbar__shelf {
   justify-self: start;
   border: 0;
   padding: 8px 12px;
@@ -122,9 +123,10 @@
 .toolbar__start {
   justify-self: start;
   display: flex;
+  gap: 6px;
 }
 
-/* Inside the start slot only one of "‹ Cover" / "✎ Edit cover" shows at a time */
+/* Closed: "‹ Shelf" and "✎ Edit". Open: "‹ Cover". */
 .toolbar__start > [hidden] { display: none; }
 
 

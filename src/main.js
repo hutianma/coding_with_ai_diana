@@ -1,11 +1,12 @@
-// App entry point: load your cards and show your binder.
+// App entry point: load your cards and show the binder you last looked at (or the bookshelf).
 import { createSampleBinder } from './data/sampleBinder.js';
 import { mountBinder } from './binder/Binder.js';
-import { loadCollection, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign, saveJournalPage, deleteJournalPage, isJournal, journalUses } from './storage/collection.js';
+import { mountShelf } from './binder/Shelf.js';
+import { loadCollection, newBinder, saveBinder, deleteBinder, findCard, moveCard, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign, saveJournalPage, deleteJournalPage, isJournal, journalUses } from './storage/collection.js';
 import { openJournalEditor } from './journal/JournalEditor.js';
 import { newJournalPage } from './journal/JournalPage.js';
 import { openCoverEditor } from './binder/CoverEditor.js';
-import { askToKeepData, savingIsAvailable } from './storage/db.js';
+import { askToKeepData, savingIsAvailable, remember, recall } from './storage/db.js';
 import { releaseImage } from './cards/imageUrls.js';
 import { stickerImages } from './decor/stickers.js';
 import { pickPhotosForNewCards, editCard } from './workshop/Workshop.js';
@@ -44,23 +45,32 @@ async function start() {
     return;
   }
   if (savingIsAvailable()) askToKeepData();
-  const { binder, cards } = collection;
+  const { binders, cards } = collection;
+  let binder = binders.find((b) => b.id === recall('binder')) ?? binders[0]; // the open binder
   // A sleeve whose card was deleted while the sleeves couldn't be loaded: it'd be empty,
   // so it goes too (as it would have then)
   for (const sleeve of Object.values(merch)) {
     if (sleeve.kind !== 'sleeve' || cards[sleeve.cardId]) continue;
     try {
-      await deleteMerch(binder, sleeve.id);
+      await deleteMerch(binders, sleeve.id);
       delete merch[sleeve.id];
     } catch { /* try again next time */ }
   }
-  let view = null;
+  let view = null; // the open binder, or the bookshelf
   let showingSamples = false; // the sample binder is shown (you haven't made anything yet)
 
-  // Draw the binder. Until you've made a card (or a journal page), show the sample cards with a hint.
+  // Open a binder (and remember it, to open it next time)
+  function openBinder(chosen, page = 0, fadeIn = true) {
+    binder = chosen;
+    remember('binder', binder.id);
+    show(page, fadeIn);
+  }
+
+  // Draw the open binder. Until you've made something (a card, a journal page or a second
+  // binder), show the sample cards with a hint.
   function show(page, fadeIn = false) {
     view?.destroy();
-    const hasCards = Object.keys(cards).length > 0 || binder.pages.some(isJournal);
+    const hasCards = Object.keys(cards).length > 0 || binders.length > 1 || binders.some((b) => b.pages.some(isJournal));
     showingSamples = !hasCards;
     let notice = null;
     if (!savingIsAvailable()) {
@@ -88,9 +98,44 @@ async function start() {
           await saveBinderDesign(binder, design);
           show(0);
         },
+        onDelete: binders.length > 1 ? removeBinder : null,
       }),
       onEditJournal: hasCards ? editJournal : null,
+      onShelf: showBookshelf,
     });
+  }
+
+  // ---------- The bookshelf ----------
+
+  function showBookshelf() {
+    view?.destroy();
+    view = mountShelf(app, { binders, cards, current: binder, onOpen: (chosen) => openBinder(chosen), onNew: makeBinder });
+  }
+
+  // A new binder: design its cover (and choose its pockets), then open it
+  function makeBinder() {
+    openCoverEditor({
+      binder: newBinder({ name: 'New binder' }),
+      cards,
+      isNew: true,
+      onSave: async ({ name, cover, layout }) => {
+        const made = newBinder({ name, cover, layout });
+        await saveBinder(made);
+        binders.push(made);
+        openBinder(made);
+      },
+    });
+  }
+
+  // Delete the open binder: its cards move to another binder (the first one left)
+  async function removeBinder() {
+    const keepIn = binders.find((b) => b !== binder);
+    await deleteBinder(binder, keepIn);
+    stickerImages(binder.cover?.stickers ?? []).forEach(releaseImage);
+    binders.splice(binders.indexOf(binder), 1);
+    binder = keepIn;
+    remember('binder', binder.id);
+    showBookshelf();
   }
 
   // ---------- Journal pages ----------
@@ -131,15 +176,18 @@ async function start() {
       <button class="toolbar__action toolbar__action--primary" type="button" data-action="new">＋ New</button>
     `;
     box.querySelector('[data-action="new"]').addEventListener('click', () => openMakeMenu(make));
-    box.querySelector('[data-action="list"]').addEventListener('click', () => openShelf());
+    box.querySelector('[data-action="list"]').addEventListener('click', () => openMyStuff());
     return box;
   }
 
-  function openShelf(tab) {
+  function openMyStuff(tab) {
     openMyCards({
       cards,
       merch,
       tab,
+      binders,
+      binderOf: (card) => findCard(binders, card.id)?.binder ?? null,
+      onMove: moveToBinder,
       onEdit: (kind, item) => {
         if (kind === 'card') editCard(item, onSave);
         else if (item.kind === 'badge') openBadgeWorkshop({ existing: item, onSave: onSaveMerch });
@@ -168,7 +216,7 @@ async function start() {
   const SHELF_TABS = { badge: 'badges', polaroid: 'polaroids', sleeve: 'sleeves' };
   const sleevesWith = (cardId) => Object.values(merch).filter((m) => m.kind === 'sleeve' && m.cardId === cardId);
 
-  // Badges, polaroids and sleeves live on the shelf; after saving, show it there
+  // Badges, polaroids and sleeves live in My stuff; after saving, show them there
   async function onSaveMerch(item, previous) {
     await saveMerch(item);
     if (previous) {
@@ -177,12 +225,12 @@ async function start() {
     }
     merch[item.id] = item;
     redrawIfOnAPage(item.id);
-    openShelf(SHELF_TABS[item.kind]);
+    openMyStuff(SHELF_TABS[item.kind]);
   }
 
   async function onDeleteMerch(item) {
     const wasOnAPage = isOnAPage(item.id);
-    await deleteMerch(binder, item.id);
+    await deleteMerch(binders, item.id);
     releaseImage(item.image);
     releaseImage(item.caption);
     stickerImages(item.stickers ?? []).forEach(releaseImage);
@@ -190,35 +238,39 @@ async function start() {
     if (wasOnAPage) show(view?.page ?? 0);
   }
 
-  const isOnAPage = (merchId) => journalUses(binder, (item) => item.merchId === merchId);
+  const isOnAPage = (merchId) => journalUses(binders, (item) => item.merchId === merchId);
 
   // A journal page shows this badge / polaroid: draw the binder again so it's up to date
   function redrawIfOnAPage(merchId) {
     if (isOnAPage(merchId)) show(view?.page ?? 0);
   }
 
-  // Save a new or edited card, then show the page it's on
+  // Save a new or edited card (a new one goes in the open binder), then show the page it's on
   async function onSave(card, previous) {
-    const page = await saveCard(binder, card);
+    const { binder: where, page } = await saveCard(binders, binder, card);
     if (previous) {
       releaseImage(previous.front); // the edited card has a new front image
       if (previous.signature !== card.signature) releaseImage(previous.signature);
     }
     cards[card.id] = card;
-    show(page);
+    openBinder(where, page, where !== binder);
+  }
+
+  // Move a card into the next empty pocket of another binder
+  async function moveToBinder(card, to) {
+    const from = findCard(binders, card.id)?.binder;
+    if (!from || from === to) return;
+    await moveCard(from, to, card.id);
+    if (from === binder || to === binder) show(view?.page ?? 0);
   }
 
   // Deleting a card also deletes the sleeves it's in (My stuff says so first)
   async function onDelete(card) {
     const sleeves = sleevesWith(card.id);
-    await deleteCard(binder, card.id, sleeves.map((m) => m.id));
+    await deleteCard(binders, card.id, sleeves.map((m) => m.id));
     for (const sleeve of sleeves) {
       stickerImages(sleeve.stickers).forEach(releaseImage);
       delete merch[sleeve.id];
-    }
-    // The cover's window showed this card: empty the window
-    if (binder.cover?.window?.cardId === card.id) {
-      await saveBinderDesign(binder, { name: binder.name, cover: { ...binder.cover, window: null } });
     }
     releaseImage(card.front);
     releaseImage(card.signature);
@@ -226,7 +278,7 @@ async function start() {
     show(view?.page ?? 0);
   }
 
-  show(startPage, true);
+  openBinder(binder, startPage);
 }
 
 function createNotice(text) {
