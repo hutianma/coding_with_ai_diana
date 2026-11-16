@@ -3,7 +3,7 @@
 //
 // Stores:
 //   cards   – one record per card you made (photos are kept as Blobs)
-//   binders – your binder(s): name, cover color, pages of card ids
+//   binders – your binders: name, cover, layout, pages of card ids
 //   merch   – badges and polaroids (added in version 2)
 
 const DB_NAME = 'pocket-fandom';
@@ -133,6 +133,18 @@ function withTimeout(promise) {
 // 7 days without a visit)
 export function askToKeepData() {
   navigator.storage?.persist?.().catch(() => {});
+}
+
+// Small settings for this device (e.g. the binder you last looked at), kept in the
+// browser's localStorage. Not kept with ?memory (tests), or if the browser blocks it.
+export function remember(key, value) {
+  if (memoryOnlyLink) return;
+  try { localStorage.setItem(`pocket-fandom:${key}`, value); } catch { /* not kept: fine */ }
+}
+
+export function recall(key) {
+  if (memoryOnlyLink) return null;
+  try { return localStorage.getItem(`pocket-fandom:${key}`); } catch { return null; }
 }
 
 // The same reads as `run`, against the in-memory fallback

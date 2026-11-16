@@ -89,7 +89,7 @@ try {
 
   // Deleting a card deletes its sleeves too (and takes them off journal pages)
   const binder = { id: 'test', pages: [{ id: 'p', slots: ['k1', null] }, { id: 'j', kind: 'journal', items: [{ kind: 'merch', merchId: 's1' }, { kind: 'merch', merchId: 's2' }] }] };
-  await deleteCard(binder, 'k1', ['s1']);
+  await deleteCard([binder], 'k1', ['s1']);
   check('deleting a card takes its sleeve off journal pages', binder.pages[0].slots[0] === null && binder.pages[1].items.length === 1 && binder.pages[1].items[0].merchId === 's2');
 
   // ---------- In the app ----------

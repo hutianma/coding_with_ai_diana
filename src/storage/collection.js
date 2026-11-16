@@ -1,22 +1,29 @@
-// Your collection: the cards you made and the binder they live in.
-// Wraps db.js with the rules for where new cards go.
+// Your collection: the cards you made and the binders they live in.
+// Wraps db.js with the rules for where cards go.
 //
+// You can have many binders (shown on the bookshelf). A card is in a pocket of one binder;
+// journal pages can show any of your cards, badges, polaroids and sleeves.
 // A binder page is either a page of pockets, { id, slots: [cardId | null, …] }, or a
 // journal page, { id, kind: 'journal', paper, items: [placed things] } (see journal/).
-import { getAll, get, writeMany } from './db.js';
+import { getAll, writeMany } from './db.js';
 import { makeId } from './ids.js';
 import { emptySlots } from '../binder/layout.js';
 
-const BINDER_ID = 'mine';
+export const LAYOUTS = ['2x2', '3x3'];
 
-export function newBinder() {
-  return {
-    id: BINDER_ID,
-    name: 'My Photocards',
-    coverColor: '#f2b8cc',
-    layout: '2x2',
-    pages: [emptyPage('2x2')],
+// A new, empty binder. (The first binder ever made has the id 'mine'.)
+export function newBinder({ id = makeId('binder'), name = 'My Photocards', layout = '2x2', cover = null, createdAt = Date.now() } = {}) {
+  const binder = {
+    id,
+    name,
+    coverColor: cover?.color ?? '#f2b8cc',
+    layout: LAYOUTS.includes(layout) ? layout : '2x2',
+    pages: [],
+    createdAt,
   };
+  if (cover) binder.cover = cover;
+  binder.pages.push(emptyPage(binder.layout));
+  return binder;
 }
 
 function emptyPage(layout) {
@@ -32,18 +39,19 @@ function copyPages(binder) {
     : { ...page, slots: [...page.slots] }));
 }
 
-// Load everything. Returns { binder, cards } where cards is { id: card }, or a
-// fresh empty binder the first time.
+// Load everything. Returns { binders, cards }: the binders in the order they were made
+// (a fresh empty one the first time), and cards as { id: card }.
 export async function loadCollection() {
-  const [binder, cardList] = await Promise.all([get('binders', BINDER_ID), getAll('cards')]);
+  const [binderList, cardList] = await Promise.all([getAll('binders'), getAll('cards')]);
   const cards = Object.fromEntries(cardList.map((card) => [card.id, card]));
-  const result = binder ?? newBinder();
-  // Cards saved without a pocket (e.g. if a save was interrupted) still go in the binder
-  const placed = new Set(result.pages.flatMap((page) => page.slots ?? []));
+  const binders = binderList.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+  if (!binders.length) binders.push(newBinder({ id: 'mine', createdAt: 0 }));
+  // Cards saved without a pocket (e.g. if a save was interrupted) go in the first binder
+  const placed = new Set(binders.flatMap((b) => b.pages.flatMap((page) => page.slots ?? [])));
   for (const card of cardList.sort((a, b) => a.createdAt - b.createdAt)) {
-    if (!placed.has(card.id)) placeInNextPocket(result, card.id);
+    if (!placed.has(card.id)) placeInNextPocket(binders[0], card.id);
   }
-  return { binder: result, cards };
+  return { binders, cards };
 }
 
 // Put a card id in the first empty pocket, adding a page when the binder is full.
@@ -63,18 +71,76 @@ export function placeInNextPocket(binder, cardId) {
   return binder.pages.length;
 }
 
-// Save a new or edited card. New cards go into the next empty pocket.
-// Returns the page number the card is on.
-export async function saveCard(binder, card) {
+// How many cards are in a binder's pockets
+export function countCards(binder) {
+  return binder.pages.reduce((sum, page) => sum + (page.slots?.filter(Boolean).length ?? 0), 0);
+}
+
+const pageWith = (binder, cardId) => binder.pages.findIndex((page) => page.slots?.includes(cardId)) + 1;
+
+// Which binder a card is in (and on which page): { binder, page }, or null
+export function findCard(binders, cardId) {
+  for (const binder of binders) {
+    const page = pageWith(binder, cardId);
+    if (page) return { binder, page };
+  }
+  return null;
+}
+
+// Save a new or edited card. A new card goes into the next empty pocket of `into`; an
+// edited one stays where it is. Returns { binder, page }: where the card is.
+export async function saveCard(binders, into, card) {
+  const found = findCard(binders, card.id);
+  const binder = found?.binder ?? into;
   const next = { ...binder, pages: copyPages(binder) };
-  let pageNumber = next.pages.findIndex((page) => page.slots?.includes(card.id)) + 1;
-  if (!pageNumber) pageNumber = placeInNextPocket(next, card.id);
+  const page = found?.page ?? placeInNextPocket(next, card.id);
   await writeMany([
     { store: 'cards', value: card },
     { store: 'binders', value: next },
   ]);
   binder.pages = next.pages; // only once it's safely saved
-  return pageNumber;
+  return { binder, page };
+}
+
+// Save a whole binder (a new one, or one whose name or cover changed)
+export async function saveBinder(binder) {
+  await writeMany([{ store: 'binders', value: binder }]);
+}
+
+// Move a card into the next empty pocket of another binder. Returns the page it's on there.
+export async function moveCard(from, to, cardId) {
+  if (from === to) return pageWith(from, cardId);
+  const fromPages = withoutCard(from, cardId);
+  const toNext = { ...to, pages: copyPages(to) };
+  const page = placeInNextPocket(toNext, cardId);
+  await writeMany([
+    { store: 'binders', value: { ...from, pages: fromPages } },
+    { store: 'binders', value: toNext },
+  ]);
+  from.pages = fromPages; // only once it's safely saved
+  to.pages = toNext.pages;
+  return page;
+}
+
+// Delete a binder. Its cards aren't deleted: they move into `keepIn` (another binder).
+// Its journal pages go with it.
+export async function deleteBinder(binder, keepIn) {
+  const cardIds = binder.pages.flatMap((page) => page.slots ?? []).filter(Boolean);
+  const next = { ...keepIn, pages: copyPages(keepIn) };
+  for (const id of cardIds) placeInNextPocket(next, id);
+  await writeMany([
+    { store: 'binders', deleteId: binder.id },
+    { store: 'binders', value: next },
+  ]);
+  keepIn.pages = next.pages; // only once it's safely saved
+}
+
+// The pages with a card's pocket emptied
+function withoutCard(binder, cardId) {
+  return copyPages(binder).map((page) => (isJournal(page) ? page : {
+    ...page,
+    slots: page.slots.map((id) => (id === cardId ? null : id)),
+  }));
 }
 
 // Save a new name and cover design for the binder
@@ -96,36 +162,42 @@ export function saveMerch(item) {
 }
 
 // Delete a badge, polaroid or sleeve, and take it off any journal page it was on
-export async function deleteMerch(binder, id) {
-  const onAPage = journalUses(binder, (item) => item.merchId === id);
-  const pages = onAPage ? withoutItems(binder, (item) => item.merchId === id) : binder.pages;
+export async function deleteMerch(binders, id) {
+  const matches = (item) => item.merchId === id;
+  const changed = binders.filter((binder) => journalUses([binder], matches))
+    .map((binder) => ({ binder, pages: withoutItems(binder, matches) }));
   await writeMany([
-    ...(onAPage ? [{ store: 'binders', value: { ...binder, pages } }] : []),
+    ...changed.map(({ binder, pages }) => ({ store: 'binders', value: { ...binder, pages } })),
     { store: 'merch', deleteId: id },
   ]);
-  binder.pages = pages; // only once it's safely saved
+  for (const { binder, pages } of changed) binder.pages = pages; // only once it's safely saved
 }
 
-// Delete a card: empty its pocket and take it off any journal page it was on. The card
-// sleeves it's in (sleeveIds) go too, as there'd be nothing in them.
-export async function deleteCard(binder, cardId, sleeveIds = []) {
+// Delete a card: empty its pocket, take it off any journal page it was on and out of any
+// cover window. The card sleeves it's in (sleeveIds) go too, as there'd be nothing in them.
+export async function deleteCard(binders, cardId, sleeveIds = []) {
   const sleeves = new Set(sleeveIds);
   const gone = (item) => item.cardId === cardId || sleeves.has(item.merchId);
-  const pages = withoutItems(binder, gone).map((page) => (isJournal(page) ? page : {
-    ...page,
-    slots: page.slots.map((id) => (id === cardId ? null : id)),
-  }));
+  const changed = binders.filter((binder) => pageWith(binder, cardId) || journalUses([binder], gone) || binder.cover?.window?.cardId === cardId)
+    .map((binder) => {
+      const next = { ...binder, pages: withoutItems({ pages: withoutCard(binder, cardId) }, gone) };
+      if (binder.cover?.window?.cardId === cardId) next.cover = { ...binder.cover, window: null };
+      return { binder, next };
+    });
   await writeMany([
-    { store: 'binders', value: { ...binder, pages } },
+    ...changed.map(({ next }) => ({ store: 'binders', value: next })),
     { store: 'cards', deleteId: cardId },
     ...sleeveIds.map((id) => ({ store: 'merch', deleteId: id })),
   ]);
-  binder.pages = pages; // only once it's safely saved
+  for (const { binder, next } of changed) { // only once it's safely saved
+    binder.pages = next.pages;
+    if (next.cover !== binder.cover) binder.cover = next.cover;
+  }
 }
 
-// Is anything matching on a journal page?
-export function journalUses(binder, matches) {
-  return binder.pages.some((page) => isJournal(page) && page.items.some(matches));
+// Is anything matching on a journal page in any of these binders?
+export function journalUses(binders, matches) {
+  return binders.some((binder) => binder.pages.some((page) => isJournal(page) && page.items.some(matches)));
 }
 
 // A copy of the pages with the matching things taken off every journal page
