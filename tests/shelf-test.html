@@ -1,0 +1,163 @@
+<!--
+  Automated bookshelf tests (M10): many binders, the shelf, making, opening, moving cards
+  between binders and deleting a binder.
+  Run:  python3 -m http.server 8765   (from the project folder)
+  Open: http://localhost:8765/tests/shelf-test.html  → every line should say PASS.
+  Uses made-up test pictures, never real photos. Runs with ?memory (no saved data touched).
+-->
+<!doctype html><meta charset="utf-8"><body>
+<h1>Bookshelf tests</h1>
+<iframe id="f" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">running…</pre>
+<script type="module">
+import { newBinder, placeInNextPocket, moveCard, deleteBinder, deleteCard, countCards, findCard } from '/src/storage/collection.js';
+
+const out = document.getElementById('out');
+const results = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : '  ← ' + extra}`);
+let win, doc;
+
+async function until(test, ms = 8000) {
+  for (let t = 0; t < ms; t += 50) { if (test()) return true; await wait(50); }
+  return false;
+}
+
+function testPicture(hue) {
+  const c = document.createElement('canvas'); c.width = 900; c.height = 1300;
+  const g = c.getContext('2d'); g.fillStyle = `hsl(${hue} 80% 50%)`; g.fillRect(0, 0, 900, 1300);
+  return new Promise((r) => c.toBlob((b) => r(new File([b], 'p.png', { type: 'image/png' })), 'image/png'));
+}
+
+async function makeCard(hue) {
+  doc.querySelector('[data-action="new"]').click(); doc.querySelector('[data-make="card"]').click();
+  await until(() => doc.querySelector('input.photo-picker'));
+  const input = doc.querySelector('input.photo-picker');
+  const dt = new win.DataTransfer();
+  dt.items.add(new win.File([await testPicture(hue)], 'p.png', { type: 'image/png' }));
+  input.files = dt.files;
+  input.dispatchEvent(new win.Event('change'));
+  await until(() => doc.querySelector('.crop__img')?.naturalWidth > 0);
+  for (let i = 0; i < 3; i++) { doc.querySelector('dialog[open] .workshop__primary').click(); await wait(400); }
+  await until(() => !doc.querySelector('dialog[open]'));
+}
+
+const label = () => doc.querySelector('.page-nav__label')?.textContent;
+const shelf = () => doc.querySelector('.shelf-view');
+const shelfNames = () => [...doc.querySelectorAll('.shelf__name')].map((n) => n.textContent.trim()).filter(Boolean);
+const editor = () => doc.querySelector('dialog.cover-editor[open]');
+
+// Close the binder (if it's open), then put it back on the shelf
+async function toShelf() {
+  await wait(800);
+  const back = doc.querySelector('.toolbar__back');
+  if (back && !back.hidden) { back.click(); await until(() => !doc.querySelector('.toolbar__shelf').hidden, 3000); }
+  doc.querySelector('.toolbar__shelf').click();
+  await until(() => shelf());
+}
+
+// Tap a slot on the shelf: the first tap brings it to the middle, the second uses it
+async function tapTwice(button) {
+  button.click(); await wait(100); button.click();
+}
+
+try {
+  // ---------- The data ----------
+  const nine = newBinder({ layout: '3x3' });
+  check('a 3 × 3 binder has 9 pockets a page; an unknown layout is 2 × 2', nine.pages[0].slots.length === 9 && newBinder({ layout: 'x' }).pages[0].slots.length === 4);
+  const a = newBinder({ name: 'A' });
+  const b = newBinder({ name: 'B', layout: '3x3' });
+  ['c1', 'c2', 'c3', 'c4', 'c5'].forEach((id) => placeInNextPocket(a, id));
+  check('cards are counted', countCards(a) === 5 && countCards(b) === 0);
+  const page = await moveCard(a, b, 'c5');
+  check('moving a card empties its pocket and puts it in the other binder', page === 1 && !a.pages[1].slots.includes('c5') && b.pages[0].slots[0] === 'c5' && findCard([a, b], 'c5').binder === b);
+  a.cover = { color: '#fff', window: { cardId: 'c5', shape: 'heart' } };
+  b.pages.push({ id: 'j', kind: 'journal', paper: 'plain', items: [{ kind: 'card', cardId: 'c5' }, { kind: 'card', cardId: 'c1' }] });
+  await deleteCard([a, b], 'c5');
+  check('deleting a card clears it from every binder (pocket, journal page, cover window)', !b.pages[0].slots.includes('c5') && b.pages[1].items.length === 1 && a.cover.window === null);
+  await deleteBinder(a, b);
+  check('deleting a binder moves its cards to the other one', countCards(b) === 4 && b.pages[0].slots.includes('c4') && b.pages[1].kind === 'journal', JSON.stringify(b.pages.map((p) => p.slots)));
+
+  // ---------- In the app ----------
+  await new Promise((r) => { f.onload = r; f.src = '/index.html?memory'; });
+  win = f.contentWindow; doc = win.document;
+  win.requestAnimationFrame = (cb) => setTimeout(() => cb(win.performance.now()), 16);
+  win.cancelAnimationFrame = (id) => clearTimeout(id);
+  const scrollTo = win.Element.prototype.scrollTo; // (headless browsers don't glide)
+  win.Element.prototype.scrollTo = function (o) { scrollTo.call(this, { ...o, behavior: 'auto' }); };
+  win.confirm = () => true;
+  await until(() => doc.querySelector('.book'), 20000);
+
+  check('the closed binder has a ‹ Shelf button', !doc.querySelector('.toolbar__shelf').hidden && !doc.querySelector('.toolbar__edit').hidden);
+  await toShelf();
+  check('the shelf shows your binder and a space for a new one', shelfNames().join() === 'My Photocards' && !!doc.querySelector('.shelf__new') && label() === '1 of 1', shelfNames().join());
+
+  // ---------- A new binder ----------
+  await tapTwice(doc.querySelector('.shelf__new'));
+  await until(() => editor());
+  check('＋ New binder opens the cover editor with a choice of pockets', doc.querySelector('#cover-editor-title').textContent === 'New binder'
+    && !!editor().querySelector('input[name="layout"][value="3x3"]') && !editor().querySelector('.cover-editor__delete'));
+  const name = editor().querySelector('input[name="name"]');
+  name.value = 'Seventeen'; name.dispatchEvent(new win.Event('input'));
+  editor().querySelector('input[name="layout"][value="3x3"]').click();
+  editor().querySelector('input[name="material"][value="pu"]').click();
+  editor().querySelector('.workshop__primary').click();
+  await until(() => !editor());
+  await until(() => doc.querySelector('.book'));
+  check('Make binder opens the new binder on its cover', doc.querySelector('.toolbar__title').textContent === 'Seventeen' && !!doc.querySelector('.cover-face.cover-design--pu'));
+
+  await makeCard(300);
+  check('a new card goes in the open binder, on a 3 × 3 page', doc.querySelector('.toolbar__title').textContent === 'Seventeen' && doc.querySelectorAll('.leaf__face--front .page--3x3 .pocket').length === 9);
+
+  await toShelf();
+  check('back on the shelf: two binders, the one you were in is in the middle', shelfNames().join() === 'My Photocards,Seventeen' && label() === '2 of 2'
+    && doc.querySelector('.shelf__slot.is-centered .shelf__count').textContent === '1 card', `${shelfNames()} ${label()}`);
+  doc.querySelector('[data-dir="prev"]').click();
+  check('the arrows look along the shelf', label() === '1 of 2');
+
+  // Open the first binder
+  doc.querySelector('.shelf__binder').click();
+  await until(() => doc.querySelector('.book'), 3000);
+  check('tapping the binder in the middle opens it', doc.querySelector('.toolbar__title').textContent === 'My Photocards');
+
+  // ---------- Move a card ----------
+  doc.querySelector('[data-action="list"]').click();
+  await until(() => doc.querySelector('dialog.my-cards[open]'));
+  doc.querySelector('.my-cards__item [data-action="move"]').click();
+  await until(() => doc.querySelector('dialog.make-menu[open]'));
+  const options = [...doc.querySelectorAll('dialog.make-menu .make-menu__option')];
+  check('Move asks which binder (not the one it\'s in)', options.map((o) => o.firstChild.textContent).join() === 'My Photocards,Seventeen' && options[1].disabled && !options[0].disabled);
+  options[0].click();
+  await wait(500);
+  doc.querySelector('.my-cards__close').click();
+  await until(() => !doc.querySelector('dialog[open]'));
+  await wait(300);
+  doc.querySelector('.cover-face').click();
+  await wait(1200);
+  check('the card moved into this binder', doc.querySelectorAll('.leaf__face--front .page--2x2 .card').length === 1, label());
+
+  // ---------- Delete a binder ----------
+  await toShelf();
+  await tapTwice(doc.querySelectorAll('.shelf__binder')[1]);
+  await until(() => doc.querySelector('.toolbar__title')?.textContent === 'Seventeen', 3000);
+  await wait(500);
+  doc.querySelector('.toolbar__edit').click();
+  await until(() => editor());
+  check('editing a binder (with another one left) offers Delete binder, not pockets', !!editor().querySelector('.cover-editor__delete') && !editor().querySelector('input[name="layout"]'));
+  editor().querySelector('.cover-editor__delete').click();
+  await until(() => shelf(), 3000);
+  check('deleting it goes back to the shelf with one binder left', shelfNames().join() === 'My Photocards', shelfNames().join());
+  check('its cards weren\'t deleted', doc.querySelector('.shelf__count').textContent === '1 card');
+  doc.querySelector('.shelf__binder').click();
+  await until(() => doc.querySelector('.book'), 3000);
+  await wait(500);
+  doc.querySelector('.toolbar__edit').click();
+  await until(() => editor());
+  check('your only binder can\'t be deleted', !editor().querySelector('.cover-editor__delete'));
+  editor().querySelector('.cover-editor__cancel').click();
+} catch (e) {
+  results.push('ERROR ' + e.stack);
+}
+out.textContent = results.join('\n');
+out.dataset.done = 1;
+</script>
