@@ -2,7 +2,7 @@
 import { createSampleBinder } from './data/sampleBinder.js';
 import { mountBinder } from './binder/Binder.js';
 import { mountShelf } from './binder/Shelf.js';
-import { loadCollection, newBinder, saveBinder, deleteBinder, findCard, moveCard, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign, saveJournalPage, deleteJournalPage, isJournal, journalUses } from './storage/collection.js';
+import { loadCollection, newBinder, saveNewBinder, deleteBinder, findCard, moveCard, saveCard, deleteCard, loadMerch, saveMerch, deleteMerch, saveBinderDesign, saveJournalPage, deleteJournalPage, isJournal, journalUses } from './storage/collection.js';
 import { openJournalEditor } from './journal/JournalEditor.js';
 import { newJournalPage } from './journal/JournalPage.js';
 import { openCoverEditor } from './binder/CoverEditor.js';
@@ -120,8 +120,7 @@ async function start() {
       isNew: true,
       onSave: async ({ name, cover, layout }) => {
         const made = newBinder({ name, cover, layout });
-        await saveBinder(made);
-        binders.push(made);
+        await saveNewBinder(binders, made);
         openBinder(made);
       },
     });
@@ -131,7 +130,9 @@ async function start() {
   async function removeBinder() {
     const keepIn = binders.find((b) => b !== binder);
     await deleteBinder(binder, keepIn);
-    stickerImages(binder.cover?.stickers ?? []).forEach(releaseImage);
+    // Let go of the images on its cover and journal pages (they went with it)
+    const journalItems = binder.pages.filter(isJournal).flatMap((page) => page.items);
+    stickerImages([...(binder.cover?.stickers ?? []), ...journalItems]).forEach(releaseImage);
     binders.splice(binders.indexOf(binder), 1);
     binder = keepIn;
     remember('binder', binder.id);
@@ -238,14 +239,16 @@ async function start() {
     if (wasOnAPage) show(view?.page ?? 0);
   }
 
-  const isOnAPage = (merchId) => journalUses(binders, (item) => item.merchId === merchId);
+  // Is it on a journal page of the open binder (so the binder needs drawing again)?
+  const isOnAPage = (merchId) => journalUses([binder], (item) => item.merchId === merchId);
 
   // A journal page shows this badge / polaroid: draw the binder again so it's up to date
   function redrawIfOnAPage(merchId) {
     if (isOnAPage(merchId)) show(view?.page ?? 0);
   }
 
-  // Save a new or edited card (a new one goes in the open binder), then show the page it's on
+  // Save a new or edited card (a new one goes in the open binder). Then show the page it's
+  // on, if it's in the open binder (an edited card may be in another one: stay here).
   async function onSave(card, previous) {
     const { binder: where, page } = await saveCard(binders, binder, card);
     if (previous) {
@@ -253,13 +256,14 @@ async function start() {
       if (previous.signature !== card.signature) releaseImage(previous.signature);
     }
     cards[card.id] = card;
-    openBinder(where, page, where !== binder);
+    show(where === binder ? page : view?.page ?? 0);
   }
 
   // Move a card into the next empty pocket of another binder
   async function moveToBinder(card, to) {
     const from = findCard(binders, card.id)?.binder;
-    if (!from || from === to) return;
+    if (!from) throw new Error('This card isn\'t in a binder. Try reloading the page.');
+    if (from === to) return;
     await moveCard(from, to, card.id);
     if (from === binder || to === binder) show(view?.page ?? 0);
   }

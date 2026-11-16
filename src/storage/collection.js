@@ -71,11 +71,6 @@ export function placeInNextPocket(binder, cardId) {
   return binder.pages.length;
 }
 
-// How many cards are in a binder's pockets
-export function countCards(binder) {
-  return binder.pages.reduce((sum, page) => sum + (page.slots?.filter(Boolean).length ?? 0), 0);
-}
-
 const pageWith = (binder, cardId) => binder.pages.findIndex((page) => page.slots?.includes(cardId)) + 1;
 
 // Which binder a card is in (and on which page): { binder, page }, or null
@@ -102,9 +97,11 @@ export async function saveCard(binders, into, card) {
   return { binder, page };
 }
 
-// Save a whole binder (a new one, or one whose name or cover changed)
-export async function saveBinder(binder) {
-  await writeMany([{ store: 'binders', value: binder }]);
+// Save a new binder. The others are saved with it: the very first binder only exists in
+// memory until something is saved in it, and mustn't be lost.
+export async function saveNewBinder(binders, binder) {
+  await writeMany([...binders, binder].map((value) => ({ store: 'binders', value })));
+  binders.push(binder);
 }
 
 // Move a card into the next empty pocket of another binder. Returns the page it's on there.

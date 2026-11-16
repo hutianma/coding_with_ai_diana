@@ -10,7 +10,9 @@
 <iframe id="f" style="width:390px;height:844px;border:0"></iframe>
 <pre id="out">running…</pre>
 <script type="module">
-import { newBinder, placeInNextPocket, moveCard, deleteBinder, deleteCard, countCards, findCard } from '/src/storage/collection.js';
+import { newBinder, saveNewBinder, placeInNextPocket, moveCard, deleteBinder, deleteCard, findCard } from '/src/storage/collection.js';
+import { getAll } from '/src/storage/db.js';
+import { countCards } from '/src/binder/layout.js';
 
 const out = document.getElementById('out');
 const results = [];
@@ -77,6 +79,11 @@ try {
   check('deleting a card clears it from every binder (pocket, journal page, cover window)', !b.pages[0].slots.includes('c5') && b.pages[1].items.length === 1 && a.cover.window === null);
   await deleteBinder(a, b);
   check('deleting a binder moves its cards to the other one', countCards(b) === 4 && b.pages[0].slots.includes('c4') && b.pages[1].kind === 'journal', JSON.stringify(b.pages.map((p) => p.slots)));
+
+  const list = [newBinder({ id: 'first' })];
+  await saveNewBinder(list, newBinder({ id: 'second' }));
+  const saved = (await getAll('binders')).map((x) => x.id);
+  check('making a second binder also saves the first one (it may never have been saved)', ['first', 'second'].every((id) => saved.includes(id)) && list.length === 2);
 
   // ---------- In the app ----------
   await new Promise((r) => { f.onload = r; f.src = '/index.html?memory'; });

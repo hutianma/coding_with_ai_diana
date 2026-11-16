@@ -2,8 +2,7 @@
 // the arrows / ← → keys) to look along it; the one in the middle comes forward. Tap it to
 // pull it out and open it. At the end there's a space for a new binder.
 import { decorateCover } from './CoverDesign.js';
-import { plural } from './Binder.js';
-import { countCards } from '../storage/collection.js';
+import { countCards, plural } from './layout.js';
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -85,16 +84,25 @@ export function mountShelf(root, { binders, cards, current = null, onOpen, onNew
     });
     return best;
   }
-  // Swiping: whichever binder is nearest the middle is the middle one
+  // Swiping: whichever binder is nearest the middle is the middle one. (Not while gliding
+  // to a binder that was chosen: that one is the middle one already.)
+  let glideTo = null; // where a glide is going (scrollLeft), or null
+  let glideTimer = 0;
   track.addEventListener('scroll', () => {
     frame ||= requestAnimationFrame(() => {
       const best = measure();
+      if (glideTo !== null && Math.abs(track.scrollLeft - glideTo) > 2) return;
+      glideTo = null;
       if (best !== centered) {
         centered = best;
         updateNav();
       }
     });
   }, { passive: true });
+  // A finger or wheel takes over from a glide
+  for (const type of ['pointerdown', 'wheel', 'touchstart']) {
+    track.addEventListener(type, () => { glideTo = null; }, { passive: true });
+  }
 
   function updateNav() {
     label.textContent = centered < binders.length ? `${centered + 1} of ${binders.length}` : 'New binder';
@@ -110,6 +118,11 @@ export function mountShelf(root, { binders, cards, current = null, onOpen, onNew
     const slot = slots[centered];
     const left = slot.offsetLeft + slot.offsetWidth / 2 - track.clientWidth / 2;
     const glide = smooth && !reducedMotion.matches;
+    if (glide) {
+      glideTo = Math.max(0, Math.min(track.scrollWidth - track.clientWidth, left));
+      clearTimeout(glideTimer);
+      glideTimer = setTimeout(() => { glideTo = null; }, 1000); // in case it never quite arrives
+    }
     track.scrollTo({ left, behavior: glide ? 'smooth' : 'auto' });
     updateNav();
     if (!glide) measure();
@@ -163,10 +176,20 @@ export function mountShelf(root, { binders, cards, current = null, onOpen, onNew
 
   root.replaceChildren(view);
   scrollToSlot(centered, false);
+  // A new screen size (e.g. turning the phone): sizes change, so put the middle one back
+  let lastWidth = track.clientWidth;
+  const resized = new ResizeObserver(() => {
+    if (track.clientWidth === lastWidth) return;
+    lastWidth = track.clientWidth;
+    scrollToSlot(centered, false);
+  });
+  resized.observe(track);
 
   return {
     destroy() {
       cancelAnimationFrame(frame);
+      clearTimeout(glideTimer);
+      resized.disconnect();
       view.remove();
     },
   };

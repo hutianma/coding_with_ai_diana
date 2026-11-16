@@ -1,12 +1,11 @@
 import { createPage, createBlankPage } from './Sleeve.js';
 import { PageFlip } from './PageFlip.js';
 import { createPaging, pageLabel, clamp } from './paging.js';
-import { emptySlots } from './layout.js';
+import { emptySlots, countCards, plural } from './layout.js';
 import { openCardViewer } from '../cards/CardViewer.js';
 import { decorateCover } from './CoverDesign.js';
 import { createJournalPage } from '../journal/JournalPage.js';
 import { openMerchViewer } from '../merch/viewMerch.js';
-import { countCards } from '../storage/collection.js';
 
 const phoneQuery = matchMedia('(max-width: 700px)');
 
@@ -247,6 +246,3 @@ function createInsideCover() {
   return el;
 }
 
-export function plural(count, word) {
-  return `${count} ${word}${count === 1 ? '' : 's'}`;
-}

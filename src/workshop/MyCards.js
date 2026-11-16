@@ -187,8 +187,8 @@ export function openMakeMenu(onChoose) {
     title: 'Make something new',
     options: [
       { value: 'card', html: `${icon('card')}Photocard` },
-      { value: 'badge', html: `${icon('badge')}Badge <small>吧唧</small>` },
-      { value: 'polaroid', html: `${icon('polaroid')}Polaroid <small>拍立得</small>` },
+      { value: 'badge', html: `${icon('badge')}Badge` },
+      { value: 'polaroid', html: `${icon('polaroid')}Polaroid` },
       { value: 'sleeve', html: `${icon('sleeve')}Card sleeve` },
       { value: 'journal', html: `${icon('journal')}Journal page` },
     ],
