@@ -4,7 +4,7 @@
    goes down to 0 one binder away). */
 
 .shelf-view {
-  --cover-w: min(56vw, 250px, (var(--screen-h) - 320px - var(--safe-top) - var(--safe-bottom)) / 1.45);
+  --cover-w: min(56vw, 250px, (var(--screen-h) - 370px - var(--safe-top) - var(--safe-bottom)) / 1.45);
   width: 100%;
   display: grid;
   justify-items: center;
@@ -40,6 +40,8 @@
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .shelf__track::-webkit-scrollbar { display: none; }
@@ -78,14 +80,17 @@
   transform-origin: 50% 100%;
   transform: scale(calc(0.78 + var(--near) * 0.22));
   opacity: calc(0.55 + var(--near) * 0.45);
-  transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+  /* Following the sliding: quick. Lifting under the mouse (below): a little softer. */
+  transition: transform 0.12s linear, opacity 0.12s linear, translate 0.2s ease-out, scale 0.2s ease-out;
 }
 
-/* With a mouse: the binder under it lifts up and grows a little */
+/* With a mouse: the binder under it lifts up and grows a little (on top of its size on the
+   shelf, set by transform) */
 @media (hover: hover) {
   .shelf__track:not(.is-dragging) .shelf__binder:hover,
   .shelf__track:not(.is-dragging) .shelf__new:hover {
-    transform: translateY(-10px) scale(calc((0.78 + var(--near) * 0.22) * 1.1));
+    translate: 0 -10px;
+    scale: 1.1;
     opacity: 1;
   }
 }

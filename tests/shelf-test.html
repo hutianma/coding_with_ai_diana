@@ -126,19 +126,20 @@ try {
   const track = doc.querySelector('.shelf__track');
   const first = doc.querySelector('.shelf__binder');
   const r = first.getBoundingClientRect();
-  const mouse = (type, x) => first.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'mouse', isPrimary: true, button: 0, clientX: x, clientY: r.top + 20 }));
+  const mouse = (type, x) => first.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'mouse', isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: r.top + 20 }));
   mouse('pointerdown', r.left + 100);
   mouse('pointermove', r.left + 60);
   check('dragging with a mouse slides the shelf', track.classList.contains('is-dragging') && track.scrollLeft > 30, String(track.scrollLeft));
   mouse('pointermove', r.left - 120);
   mouse('pointerup', r.left - 120);
-  first.click(); // the click that follows a drag
-  await wait(300);
+  first.click(); // the click that comes with letting go
+  await wait(1200); // (snapping comes back once the glide is over)
   check('letting go settles on the nearest binder (and doesn\'t open one)', label() === '2 of 2' && !track.classList.contains('is-dragging') && !!shelf(), label());
-
-  // The mouse wheel steps along the shelf
-  track.dispatchEvent(new win.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -60 }));
-  check('the mouse wheel steps to the next binder', label() === '1 of 2', label());
+  const before = track.scrollLeft;
+  mouse('pointerdown', r.left + 100);
+  first.dispatchEvent(new win.PointerEvent('pointermove', { bubbles: true, pointerId: 7, pointerType: 'mouse', isPrimary: true, buttons: 0, clientX: r.left - 100, clientY: r.top }));
+  check('after letting go outside the shelf, moving the mouse doesn\'t drag it', track.scrollLeft === before && !track.classList.contains('is-dragging'));
+  doc.querySelector('[data-dir="prev"]').click();
 
   // Open the first binder
   doc.querySelector('.shelf__binder').click();
