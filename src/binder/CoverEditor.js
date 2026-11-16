@@ -8,8 +8,10 @@ import { imageUrl, releaseImage } from '../cards/imageUrls.js';
 
 const NAME_MAX = 40;
 
-// onSave({ name, cover }) must save it (and may throw if saving fails)
-export function openCoverEditor({ binder, cards = {}, onSave }) {
+// onSave({ name, cover, layout }) must save it (and may throw if saving fails).
+// isNew: a binder that's being made (its pockets, 2×2 or 3×3, can be chosen only now).
+// onDelete(): delete the binder (offered only if given).
+export function openCoverEditor({ binder, cards = {}, onSave, isNew = false, onDelete = null }) {
   // Work on a copy; nothing changes until Save
   const start = coverOf(binder);
   const cardList = Object.values(cards).filter((c) => c.front).sort((a, b) => a.createdAt - b.createdAt);
@@ -17,6 +19,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
   const startWindow = start.window && cards[start.window.cardId] ? { ...start.window } : null;
   const draft = {
     name: binder.name,
+    layout: binder.layout ?? '2x2',
     cover: { ...start, title: { ...start.title }, window: startWindow, stickers: start.stickers.map((s) => ({ ...s })) },
   };
   const startImages = new Set(stickerImages(start.stickers));
@@ -26,7 +29,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
   dialog.setAttribute('aria-labelledby', 'cover-editor-title');
   dialog.innerHTML = `
     <header class="workshop__header">
-      <h2 id="cover-editor-title" class="workshop__title">Edit cover</h2>
+      <h2 id="cover-editor-title" class="workshop__title">${isNew ? 'New binder' : 'Edit cover'}</h2>
       <button class="workshop__close" type="button" aria-label="Close">✕</button>
     </header>
     <div class="cover-editor__body">
@@ -39,6 +42,11 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
           <span>Name</span>
           <input type="text" name="name" maxlength="${NAME_MAX}" autocomplete="off">
         </label>
+        ${isNew ? `<fieldset class="patterns">
+          <legend>Pockets</legend>
+          <label class="pattern"><input type="radio" name="layout" value="2x2"><span>2 × 2 <small>(4 a page)</small></span></label>
+          <label class="pattern"><input type="radio" name="layout" value="3x3"><span>3 × 3 <small>(9 a page)</small></span></label>
+        </fieldset>` : ''}
         <label class="workshop__zoom">
           <span>Title size</span>
           <input type="range" name="title-size" min="${TITLE_SIZE.min}" max="${TITLE_SIZE.max}" step="0.05">
@@ -81,8 +89,9 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     </div>
     <p class="workshop__error" role="alert" hidden></p>
     <footer class="workshop__footer">
-      <button class="workshop__secondary" type="button">Cancel</button>
-      <button class="workshop__primary" type="button">Save cover</button>
+      ${onDelete ? '<button class="workshop__secondary cover-editor__delete" type="button">Delete binder</button>' : ''}
+      <button class="workshop__secondary cover-editor__cancel" type="button">Cancel</button>
+      <button class="workshop__primary" type="button">${isNew ? 'Make binder' : 'Save cover'}</button>
     </footer>
   `;
   const $ = (sel) => dialog.querySelector(sel);
@@ -165,6 +174,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     const input = dialog.querySelector(`input[name="${name}"][value="${value}"]`);
     if (input) input.checked = true;
   }
+  check('layout', draft.layout);
   check('font', draft.cover.font);
   check('material', draft.cover.material);
   check('color', draft.cover.color);
@@ -178,6 +188,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
 
   dialog.addEventListener('change', (event) => {
     const { name, value } = event.target;
+    if (name === 'layout') draft.layout = value;
     if (name === 'font') draft.cover.font = value;
     if (name === 'material') draft.cover.material = value;
     if (name === 'color' || name === 'custom-color') {
@@ -256,7 +267,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
 
   function setBusy(value) {
     busy = value;
-    $('.workshop__primary').disabled = $('.workshop__secondary').disabled = value;
+    dialog.querySelectorAll('.workshop__footer button').forEach((b) => { b.disabled = value; });
   }
 
   // Let go of sticker images that are no longer used (to free memory): after Save, the
@@ -276,7 +287,7 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
     try {
       // A copy, so later changes in this (closing) editor can't reach the saved cover
       const cover = { ...draft.cover, title: { ...draft.cover.title }, window: draft.cover.window ? { ...draft.cover.window } : null, stickers: draft.cover.stickers.map((s) => ({ ...s })) };
-      await onSave({ name: draft.name.trim() || binder.name, cover });
+      await onSave({ name: draft.name.trim() || binder.name, cover, layout: draft.layout });
       close(true);
     } catch (err) {
       showError(`Couldn't save the cover. ${err.message ?? ''}`.trim());
@@ -284,7 +295,22 @@ export function openCoverEditor({ binder, cards = {}, onSave }) {
       setBusy(false);
     }
   });
-  $('.workshop__secondary').addEventListener('click', () => { if (!busy) close(); });
+  $('.cover-editor__cancel').addEventListener('click', () => { if (!busy) close(); });
+  $('.cover-editor__delete')?.addEventListener('click', async () => {
+    if (busy) return;
+    // eslint-disable-next-line no-alert
+    if (!confirm(`Delete the binder "${binder.name}"? Its photocards aren't deleted: they move to another binder. Its journal pages are deleted.`)) return;
+    setBusy(true);
+    showError('');
+    try {
+      await onDelete();
+      close();
+    } catch (err) {
+      showError(`Couldn't delete the binder. ${err.message ?? ''}`.trim());
+    } finally {
+      setBusy(false);
+    }
+  });
   $('.workshop__close').addEventListener('click', () => { if (!busy) close(); });
   dialog.addEventListener('cancel', (event) => {
     event.preventDefault();

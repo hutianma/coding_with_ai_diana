@@ -249,7 +249,8 @@
   resize: vertical;
 }
 
-.journal-editor__delete {
+.journal-editor__delete,
+.cover-editor__delete {
   margin-right: auto;
   color: #c0392b;
 }

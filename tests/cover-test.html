@@ -183,7 +183,7 @@ try {
     && doc.querySelector('dialog.cover-editor input[name="name"]').value === '<b>My</b> 앨범');
   set('material', 'glitter');
   doc.querySelector('[data-sticker="crown"]').click();
-  doc.querySelector('dialog.cover-editor .workshop__secondary').click();
+  doc.querySelector('dialog.cover-editor .cover-editor__cancel').click();
   await until(() => !editor());
   check('Cancel keeps the saved cover', coverFace().classList.contains('cover-design--pu') && coverFace().querySelectorAll('.sticker').length === 2);
 
@@ -198,7 +198,7 @@ try {
   doc.querySelector('.toolbar__edit').click();
   await until(() => editor());
   check('…and the editor shows None', doc.querySelector('.cover-editor__card--none').getAttribute('aria-checked') === 'true' && doc.querySelector('.window-shapes').hidden);
-  doc.querySelector('dialog.cover-editor .workshop__secondary').click();
+  doc.querySelector('dialog.cover-editor .cover-editor__cancel').click();
   await until(() => !editor());
 
   // The cover still opens like a page
