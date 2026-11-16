@@ -125,8 +125,8 @@ A milestone is finished only when **all** of these are true:
 3. ✅ **Check:** a card looks special on its own.
 
 ### M10: Binder library
-1. More than one binder (create, rename, delete; cards belong to a binder).
-2. A shelf of binders you swipe through, then pull one out to open it.
+1. More than one binder (create with 2×2 or 3×3 pockets, rename, delete; cards belong to a binder and can be moved to another). Deleting a binder keeps its cards (Diana).
+2. A shelf of binders you swipe through, then pull one out to open it. The app opens the binder you last looked at (Diana); ‹ Shelf goes back.
 3. ✅ **Check:** switching binders feels fun.
 
 ### M11: Ita bag
