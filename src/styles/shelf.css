@@ -1,0 +1,166 @@
+/* ---------- The bookshelf (Shelf.js) ----------
+   Binders stand on a wooden shelf, covers facing out, in a row you swipe along. The one
+   in the middle (--near = 1) is bigger and in front; the others shrink and fade (--near
+   goes down to 0 one binder away). */
+
+.shelf-view {
+  --cover-w: min(56vw, 250px, (var(--screen-h) - 320px - var(--safe-top) - var(--safe-bottom)) / 1.45);
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  animation: fade-in 0.35s ease;
+}
+
+.shelf-view--still { animation: none; }
+
+.shelf-view__title {
+  margin: 0;
+  font-size: inherit;
+}
+
+.shelf-view .toolbar__title { display: block; } /* (phones hide the binder's title) */
+
+.shelf {
+  position: relative;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+}
+
+.shelf__track {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  margin: 0;
+  padding: 24px calc(50vw - var(--cover-w) * 0.6) 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shelf__track::-webkit-scrollbar { display: none; }
+
+.shelf__slot {
+  --near: 0;
+  flex: none;
+  width: calc(var(--cover-w) * 1.2);
+  display: grid;
+  justify-items: center;
+  scroll-snap-align: center;
+  text-align: center;
+}
+
+/* A binder: its cover, standing up, a little thick (the darker edge on the left is the spine) */
+.shelf__binder,
+.shelf__new {
+  position: relative;
+  width: var(--cover-w);
+  aspect-ratio: 1 / 1.45;
+  padding: 0;
+  border: 0;
+  border-radius: 4px 16px 16px 4px;
+  font: inherit;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+  transform: scale(calc(0.78 + var(--near) * 0.22));
+  opacity: calc(0.55 + var(--near) * 0.45);
+  transition: transform 0.12s linear, opacity 0.12s linear;
+}
+
+.shelf__binder {
+  box-shadow:
+    inset 4px 0 0 rgba(0, 0, 0, 0.1),
+    0 calc(8px + var(--near) * 10px) calc(14px + var(--near) * 14px) -8px rgba(40, 10, 30, 0.45);
+}
+
+/* Shading along the spine edge, as on the binder's cover */
+.shelf__binder::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0 auto 0 0;
+  width: 8%;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent);
+  pointer-events: none;
+}
+
+.shelf__binder:focus-visible,
+.shelf__new:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.shelf__binder.is-pulled { z-index: 2; }
+
+.shelf-view.is-opening .shelf__slot:not(:has(.is-pulled)) {
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+/* The space for a new binder: a dashed outline */
+.shelf__new {
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--pocket-edge);
+  border: 2px dashed var(--muted);
+  font-weight: 600;
+}
+
+.shelf__new span {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.shelf__name,
+.shelf__count {
+  max-width: var(--cover-w);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: var(--near);
+  transition: opacity 0.12s linear;
+}
+
+/* Fixed heights, so the plank (below) lines up with the bottom of the binders */
+.shelf__name {
+  height: 22px;
+  margin-top: 22px; /* below the plank */
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.shelf__count {
+  height: 18px;
+  line-height: 18px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* The plank the binders stand on: from the bottom of the binders (62px above the
+   bottom: name + its margin + count), 18px deep */
+.shelf__plank {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  height: 18px;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 4px),
+    linear-gradient(180deg, #d9b48a, #b98d63 70%, #9c7350);
+  box-shadow: 0 10px 18px -8px rgba(40, 10, 30, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shelf-view { animation: none; }
+  .shelf__binder,
+  .shelf__new,
+  .shelf__name,
+  .shelf__count { transition: none; }
+}
